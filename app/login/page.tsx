@@ -73,7 +73,7 @@ export default function LoginPage() {
               />
             </div>
 
-            {/* Remember Me Checkbox 
+            {/* Remember Me Checkbox */}
             <div className="flex items-center space-x-2">
               <Checkbox
                 id="remember"
@@ -83,7 +83,7 @@ export default function LoginPage() {
               <label htmlFor="remember" className="text-sm text-gray-700 cursor-pointer">
                 Remember me
               </label>
-            </div>*/}
+            </div>
 
             {/* Footer with Links and Button */}
             <div className="flex items-center justify-between pt-4">
