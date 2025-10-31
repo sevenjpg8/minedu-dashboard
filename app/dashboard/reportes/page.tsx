@@ -3,24 +3,6 @@
 import { useEffect, useState } from "react"
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from "recharts"
 
-const generateChartData = (filterId: string) => {
-  const baseData = [
-    { name: "Muy en desacuerdo", "# de Respuestas": 0.2 },
-    { name: "En desacuerdo", "# de Respuestas": 0.3 },
-    { name: "De acuerdo", "# de Respuestas": 0.7 },
-    { name: "Muy de acuerdo", "# de Respuestas": 0.8 },
-  ]
-
-  // Vary data slightly based on filter selection for demo purposes
-  if (filterId) {
-    return baseData.map((item) => ({
-      ...item,
-      "# de Respuestas": Math.min(1, item["# de Respuestas"] + Math.random() * 0.2),
-    }))
-  }
-  return baseData
-}
-
 const ChartCard = ({ title, data }: { title: string; data: any[] }) => (
   <div className="bg-white rounded-lg shadow-sm p-6">
     <h3 className="text-lg font-semibold text-gray-800 mb-4">{title}</h3>
@@ -154,19 +136,55 @@ export default function ReportesPage() {
         Object.entries(filters).filter(([_, v]) => v !== "")
       );
 
-      console.log("🧩 Enviando filtros:", Object.fromEntries(params));
-
       const res = await fetch(`/api/reportes?${params.toString()}`);
       const data = await res.json();
 
-      console.log("📈 Datos recibidos:", data);
+      if (!data.success) {
+        setCharts([]);
+        return;
+      }
 
-      if (data.success) setCharts(data.charts);
+      let filteredData = data.charts;
+
+      // 🔹 Filtrado adicional por DRE / UGEL / colegio
+      filteredData = filteredData.filter((row: any) => {
+        // Filtrar por DRE
+        if (filters.dre) {
+          const dreMatch = row.survey_participation?.school?.ugel?.some(
+            (u: any) => u.dre?.id === Number(filters.dre)
+          );
+          if (!dreMatch) return false;
+        }
+
+        // Filtrar por UGEL
+        if (filters.ugel) {
+          const ugelMatch = row.survey_participation?.school?.ugel?.some(
+            (u: any) => u.id === Number(filters.ugel)
+          );
+          if (!ugelMatch) return false;
+        }
+
+        // Filtrar por colegio individual
+        if (filters.colegio) {
+          if (row.survey_participation?.school?.id !== Number(filters.colegio))
+            return false;
+        }
+
+        return true;
+      });
+
+      setCharts(filteredData);
     };
 
     fetchCharts();
-  }, [filters]);
-
+  }, [
+    filters.encuesta,
+    filters.dre,
+    filters.ugel,
+    filters.colegio,
+    filters.nivelEducativo,
+    filters.grado
+  ]);
 
   return (
     <div>

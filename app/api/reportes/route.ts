@@ -1,3 +1,4 @@
+//reportes/route.ts
 import { NextResponse } from "next/server"
 import { supabase } from "@/lib/supabaseClient"
 
@@ -60,22 +61,54 @@ export async function GET(req: Request) {
           grade,
           school:school_id(
             id,
-            ugel:ugels!schools_ugel_id_fkey(
-              id,
-              dre:dre_id(id)
-            )
+            ugel_id
           )
         )
       `)
       .eq("survey_participation.survey_id", surveyId)
       .in("survey_participation.school_id", colegiosIds)
 
-    // 3️⃣ Filtros jerárquicos
-    if (dreId) query = query.eq("survey_participation.school.ugel.dre.id", dreId)
-    if (ugelId) query = query.eq("survey_participation.school.ugel.id", ugelId)
+    let escuelasFiltradas = colegiosIds
+
+    if (dreId) {
+      const { data, error } = await supabase
+        .from("schools")
+        .select("id, ugel(id, dre_id)")
+
+      if (!error && data) {
+        // ugel viene como arreglo
+        const escuelasDRE = data as { id: number; ugel?: { id: number; dre_id: number }[] | null }[]
+
+        escuelasFiltradas = escuelasFiltradas.filter(id =>
+          escuelasDRE.some(s => 
+            s.id === id && s.ugel?.some(u => u.dre_id === Number(dreId))
+          )
+        )
+      }
+    }
+
+
+    if (ugelId) {
+      const { data, error } = await supabase
+        .from("schools")
+        .select("id, ugel_id")
+
+      if (!error && data) {
+        const escuelasUGEL = data as { id: number; ugel_id: number }[]
+        escuelasFiltradas = escuelasFiltradas.filter(id =>
+          escuelasUGEL.some(s => s.id === id && s.ugel_id === Number(ugelId))
+        )
+      }
+    }
+
+
+    // 3️⃣ Aplicar filtros finales
+    query = query.in("survey_participation.school_id", escuelasFiltradas)
+
     if (schoolId) query = query.eq("survey_participation.school_id", schoolId)
     if (nivelEducativo) query = query.eq("survey_participation.education_level", nivelEducativo)
     if (grado) query = query.eq("survey_participation.grade", grado)
+
 
     const { data, error } = await query.returns<AnswerRow[]>()
 
