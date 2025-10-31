@@ -56,7 +56,7 @@ export default function Header() {
           >
             Reportes
           </Link>
-          {/*<Link
+          <Link
             href="/dashboard/importar"
             className={`pb-4 border-b-2 font-medium transition-colors ${
               isActive("/dashboard/importar")
@@ -65,7 +65,7 @@ export default function Header() {
             }`}
           >
             Importar Colegios
-          </Link>*/}
+          </Link>
         </nav>
       </div>
 
