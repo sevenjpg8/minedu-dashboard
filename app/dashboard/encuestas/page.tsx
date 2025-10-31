@@ -1,67 +1,47 @@
 "use client"
 
-import type React from "react"
-
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import { Trash2, Edit2, X, Plus } from "lucide-react"
+import { supabase } from "@/lib/supabaseClient"
+import { getSurveys, type Survey as SurveyBase } from "@/lib/getSurveys"
 
 interface Question {
   id: number
   text: string
 }
 
-interface Survey {
-  id: number
-  title: string
-  description: string
-  status: "Activa" | "Inactiva"
-  startDate: string
-  endDate: string
+interface Survey extends SurveyBase {
   questions?: Question[]
 }
 
 export default function EncuestasPage() {
-  const [surveys, setSurveys] = useState<Survey[]>([
-    {
-      id: 1,
-      title: "dsasdsad",
-      description: "sadasd",
-      status: "Activa",
-      startDate: "11/10/2025",
-      endDate: "14/10/2025",
-      questions: [],
-    },
-    {
-      id: 2,
-      title: "Encuesta de Convivencia Escolar 2025 - Primaria",
-      description: "Queremos saber cómo te sientes en tu colegio. ¡Tus...",
-      status: "Activa",
-      startDate: "09/10/2025",
-      endDate: "09/11/2025",
-      questions: [],
-    },
-    {
-      id: 3,
-      title: "Encuesta de Convivencia Escolar 2025 - Secundaria",
-      description: "Tu opinión es fundamental para mejorar la conviven...",
-      status: "Activa",
-      startDate: "09/10/2025",
-      endDate: "09/11/2025",
-      questions: [],
-    },
-  ])
-
+  const [surveys, setSurveys] = useState<Survey[]>([])
+  const [loading, setLoading] = useState(true)
   const [showModal, setShowModal] = useState(false)
   const [editingId, setEditingId] = useState<number | null>(null)
   const [formData, setFormData] = useState({
     title: "",
     description: "",
-    startDate: "",
-    endDate: "",
-    active: false,
+    starts_at: "",
+    ends_at: "",
+    is_active: false,
   })
   const [questions, setQuestions] = useState<Question[]>([])
   const [newQuestion, setNewQuestion] = useState("")
+
+  useEffect(() => {
+    const fetchSurveys = async () => {
+      const data = await getSurveys()
+      const formatted = data.map((s) => ({
+        ...s,
+        questions: [],
+      }))
+      setSurveys(formatted)
+      setLoading(false)
+    }
+
+    fetchSurveys()
+  }, [])
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { name, value, type } = e.target as HTMLInputElement
@@ -76,9 +56,9 @@ export default function EncuestasPage() {
     setFormData({
       title: survey.title,
       description: survey.description,
-      startDate: survey.startDate,
-      endDate: survey.endDate,
-      active: survey.status === "Activa",
+      starts_at: survey.starts_at,
+      ends_at: survey.ends_at,
+      is_active: survey.is_active,
     })
     setQuestions(survey.questions || [])
     setShowModal(true)
@@ -109,10 +89,10 @@ export default function EncuestasPage() {
                 ...survey,
                 title: formData.title,
                 description: formData.description,
-                status: formData.active ? "Activa" : "Inactiva",
-                startDate: formData.startDate,
-                endDate: formData.endDate,
-                questions: questions,
+                starts_at: formData.starts_at,
+                ends_at: formData.ends_at,
+                is_active: formData.is_active,
+                questions,
               }
             : survey,
         ),
@@ -122,14 +102,16 @@ export default function EncuestasPage() {
         id: surveys.length + 1,
         title: formData.title,
         description: formData.description,
-        status: formData.active ? "Activa" : "Inactiva",
-        startDate: formData.startDate,
-        endDate: formData.endDate,
-        questions: questions,
+        unique_link_slug: "",
+        starts_at: formData.starts_at,
+        ends_at: formData.ends_at,
+        is_active: formData.is_active,
+        questions,
       }
       setSurveys([...surveys, newSurvey])
     }
-    setFormData({ title: "", description: "", startDate: "", endDate: "", active: false })
+
+    setFormData({ title: "", description: "", starts_at: "", ends_at: "", is_active: false })
     setQuestions([])
     setEditingId(null)
     setShowModal(false)
@@ -142,7 +124,7 @@ export default function EncuestasPage() {
   const handleCloseModal = () => {
     setShowModal(false)
     setEditingId(null)
-    setFormData({ title: "", description: "", startDate: "", endDate: "", active: false })
+    setFormData({ title: "", description: "", starts_at: "", ends_at: "", is_active: false })
     setQuestions([])
     setNewQuestion("")
   }
@@ -163,7 +145,7 @@ export default function EncuestasPage() {
         <table className="w-full">
           <thead className="bg-gray-50 border-b border-gray-200">
             <tr>
-              <th className="px-6 py-3 text-left text-sm font-semibold text-gray-700">TITULO</th>
+              <th className="px-6 py-3 text-left text-sm font-semibold text-gray-700">TÍTULO</th>
               <th className="px-6 py-3 text-left text-sm font-semibold text-gray-700">ESTADO</th>
               <th className="px-6 py-3 text-left text-sm font-semibold text-gray-700">FECHAS</th>
               <th className="px-6 py-3 text-left text-sm font-semibold text-gray-700">ACCIONES</th>
@@ -173,19 +155,21 @@ export default function EncuestasPage() {
             {surveys.map((survey) => (
               <tr key={survey.id} className="border-b border-gray-200 hover:bg-gray-50">
                 <td className="px-6 py-4">
-                  <div>
-                    <p className="text-gray-900 font-medium">{survey.title}</p>
-                    <p className="text-gray-600 text-sm">{survey.description}</p>
-                  </div>
+                  <p className="text-gray-900 font-medium">{survey.title}</p>
+                  <p className="text-gray-600 text-sm">{survey.description}</p>
                 </td>
                 <td className="px-6 py-4">
-                  <span className="inline-block bg-green-100 text-green-800 text-xs font-semibold px-3 py-1 rounded-full">
-                    {survey.status}
+                  <span
+                    className={`inline-block ${
+                      survey.is_active ? "bg-green-100 text-green-800" : "bg-gray-100 text-gray-600"
+                    } text-xs font-semibold px-3 py-1 rounded-full`}
+                  >
+                    {survey.is_active ? "Activa" : "Inactiva"}
                   </span>
                 </td>
                 <td className="px-6 py-4 text-gray-600 text-sm">
-                  <p>Inicio: {survey.startDate}</p>
-                  <p>Fin: {survey.endDate}</p>
+                  <p>Inicio: {survey.starts_at}</p>
+                  <p>Fin: {survey.ends_at}</p>
                 </td>
                 <td className="px-6 py-4">
                   <div className="flex gap-3">
@@ -211,6 +195,7 @@ export default function EncuestasPage() {
         </table>
       </div>
 
+      {/* MODAL DE CREAR/EDITAR */}
       {showModal && (
         <div className="fixed inset-0 bg-[rgba(0,0,0,0.50)] flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-lg shadow-lg max-w-2xl w-full max-h-[90vh] overflow-y-auto">
@@ -255,8 +240,8 @@ export default function EncuestasPage() {
                   <label className="block text-sm font-medium text-gray-700 mb-2">Fecha de Inicio</label>
                   <input
                     type="date"
-                    name="startDate"
-                    value={formData.startDate}
+                    name="starts_at"
+                    value={formData.starts_at}
                     onChange={handleInputChange}
                     required
                     className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
@@ -266,8 +251,8 @@ export default function EncuestasPage() {
                   <label className="block text-sm font-medium text-gray-700 mb-2">Fecha de Fin</label>
                   <input
                     type="date"
-                    name="endDate"
-                    value={formData.endDate}
+                    name="ends_at"
+                    value={formData.ends_at}
                     onChange={handleInputChange}
                     required
                     className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
@@ -278,17 +263,18 @@ export default function EncuestasPage() {
               <div className="flex items-center gap-2">
                 <input
                   type="checkbox"
-                  name="active"
-                  id="active"
-                  checked={formData.active}
+                  name="is_active"
+                  id="is_active"
+                  checked={formData.is_active}
                   onChange={handleInputChange}
                   className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-2 focus:ring-blue-500"
                 />
-                <label htmlFor="active" className="text-sm font-medium text-gray-700">
+                <label htmlFor="is_active" className="text-sm font-medium text-gray-700">
                   Activa
                 </label>
               </div>
 
+              {/* Sección de preguntas */}
               <div className="border-t border-gray-200 pt-4">
                 <h3 className="text-lg font-semibold text-gray-800 mb-4">Preguntas</h3>
 
@@ -312,7 +298,7 @@ export default function EncuestasPage() {
                     type="text"
                     value={newQuestion}
                     onChange={(e) => setNewQuestion(e.target.value)}
-                    onKeyPress={(e) => e.key === "Enter" && handleAddQuestion()}
+                    onKeyDown={(e) => e.key === "Enter" && (e.preventDefault(), handleAddQuestion())}
                     placeholder="Ingrese una nueva pregunta"
                     className="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                   />
@@ -322,7 +308,7 @@ export default function EncuestasPage() {
                     className="bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-4 rounded-lg transition-colors flex items-center gap-2"
                   >
                     <Plus size={18} />
-                    Añadir Pregunta
+                    Añadir
                   </button>
                 </div>
               </div>
