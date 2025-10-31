@@ -1,93 +1,113 @@
-import { NextResponse } from "next/server";
-import { supabase } from "@/lib/supabaseClient";
+import { NextResponse } from "next/server"
+import { supabase } from "@/lib/supabaseClient"
+
+interface AnswerRow {
+  id: number
+  question: { text: string }[] | { text: string } | null
+  option: { text: string }[] | { text: string } | null
+  survey_participation: {
+    survey_id: number
+    school_id: number
+    education_level: string
+    grade: string
+    school?: {
+      ugel_id: number
+      ugel?: { dre_id: number }
+    }
+  }
+}
 
 export async function GET(req: Request) {
-  const { searchParams } = new URL(req.url);
-
-  const encuesta = searchParams.get("encuesta");
-  const dre = searchParams.get("dre");
-  const ugel = searchParams.get("ugel");
-  const colegio = searchParams.get("colegio");
-  const grado = searchParams.get("grado");
-
-  if (!encuesta) {
-    return NextResponse.json({ success: false, error: "Debe seleccionar una encuesta" }, { status: 400 });
-  }
-
-  console.log("📊 Filtros recibidos:", { encuesta, dre, ugel, colegio, grado });
-
   try {
-    // 🔹 Obtenemos todas las preguntas de la encuesta
-    const { data: questions, error: qError } = await supabase
-      .from("questions")
-      .select("id, text")
-      .eq("survey_id", encuesta);
+    const { searchParams } = new URL(req.url)
+    const surveyId = searchParams.get("encuesta")
+    const dreId = searchParams.get("dre")
+    const ugelId = searchParams.get("ugel")
+    const schoolId = searchParams.get("colegio")
+    const nivelEducativo = searchParams.get("nivelEducativo")
+    const grado = searchParams.get("grado")
 
-    if (qError) throw qError;
-    console.log(`📋 ${questions.length} preguntas encontradas`);
+    if (!surveyId) {
+      return NextResponse.json({ success: false, message: "Falta encuesta" }, { status: 400 })
+    }
 
-    // 🔹 Obtenemos todas las respuestas (answers) de esas preguntas
-    const questionIds = questions.map((q) => q.id);
+    // 1️⃣ Obtener colegios válidos
+    const { data: colegiosValidos, error: colegiosError } = await supabase
+      .from("encuesta_relacionada")
+      .select("school_id")
 
+    if (colegiosError) throw colegiosError
+    if (!colegiosValidos || colegiosValidos.length === 0) {
+      return NextResponse.json({ success: true, charts: [] })
+    }
+
+    const colegiosIds = colegiosValidos.map((c) => Number(c.school_id))
+
+    // 2️⃣ Query principal
     let query = supabase
       .from("answers")
       .select(`
-        question_id,
-        option_id,
-        options (id, text),
-        questions (id, text),
-        survey_participations!inner(
+        id,
+        question:question_id(text),
+        option:option_id(text),
+        survey_participation:survey_participation_id(
+          survey_id,
           school_id,
-          grade,
-          schools!inner(
-            id,
-            ugel_id,
-            ugels!inner(
-              id,
-              dre_id
-            )
-          )
+          education_level,
+          grade
         )
       `)
-      .in("question_id", questionIds);
+      .eq("survey_participation.survey_id", surveyId)
+      .in("survey_participation.school_id", colegiosIds)
 
-    // 🔹 Aplicamos los filtros dinámicos
-    if (grado) query = query.eq("survey_participations.grade", grado);
-    if (colegio) query = query.eq("survey_participations.school_id", colegio);
-    if (ugel) query = query.eq("survey_participations.schools.ugel_id", ugel);
-    if (dre) query = query.eq("survey_participations.schools.ugels.dre_id", dre);
 
-    const { data: answers, error: aError } = await query;
+    if (dreId) query = query.eq("survey_participation.school.ugel.dre_id", dreId)
+    if (ugelId) query = query.eq("survey_participation.school.ugel_id", ugelId)
+    if (schoolId) query = query.eq("survey_participation.school_id", schoolId)
+    if (nivelEducativo) query = query.eq("survey_participation.education_level", nivelEducativo)
+    if (grado) query = query.eq("survey_participation.grade", grado)
 
-    if (aError) throw aError;
-    console.log(`🧾 ${answers.length} respuestas encontradas`);
+    const { data, error } = await query.returns<AnswerRow[]>()
 
-    // 🔹 Agrupamos respuestas por pregunta y opción
-    const grouped = answers.reduce((acc: any, row: any) => {
-      const qid = row.questions.id;
-      const qtext = row.questions.text;
-      const optText = row.options?.text ?? "Sin opción";
+    if (error) throw error
+    if (!data || data.length === 0)
+      return NextResponse.json({ success: true, charts: [] })
 
-      if (!acc[qid]) acc[qid] = { question: qtext, results: {} };
-      acc[qid].results[optText] = (acc[qid].results[optText] || 0) + 1;
+    // 3️⃣ Agrupar resultados
+    const agrupado: Record<string, Record<string, number>> = {}
 
-      return acc;
-    }, {});
+    for (const row of data) {
+      const pregunta =
+        Array.isArray(row.question)
+          ? row.question[0]?.text || "Sin pregunta"
+          : row.question?.text || "Sin pregunta"
 
-    // 🔹 Convertimos a formato compatible con Recharts
-    const formatted = Object.values(grouped).map((q: any) => ({
-      question: q.question,
-      data: Object.entries(q.results).map(([name, value]) => ({
+      const opcion =
+        Array.isArray(row.option)
+          ? row.option[0]?.text || "Sin opción"
+          : row.option?.text || "Sin opción"
+
+      if (!agrupado[pregunta]) agrupado[pregunta] = {}
+      if (!agrupado[pregunta][opcion]) agrupado[pregunta][opcion] = 0
+
+      agrupado[pregunta][opcion]++
+    }
+
+    // 4️⃣ Formato final
+    const charts = Object.entries(agrupado).map(([pregunta, opciones]) => ({
+      question: pregunta,
+      data: Object.entries(opciones).map(([name, count]) => ({
         name,
-        "# de Respuestas": value,
+        "# de Respuestas": count,
       })),
-    }));
+    }))
 
-    console.log("✅ Datos formateados para frontend:", formatted.slice(0, 2));
-
-    return NextResponse.json({ success: true, charts: formatted });
+    return NextResponse.json({ success: true, charts })
   } catch (err) {
-    console.error("❌ Error en /api/reportes:", err);
-    return NextResponse.json({ success: false, error: "Error interno" }, { status: 500 });
+    console.error("Error en /api/reportes:", err)
+    return NextResponse.json(
+      { success: false, message: "Error interno del servidor" },
+      { status: 500 }
+    )
   }
 }
