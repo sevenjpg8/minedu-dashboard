@@ -134,11 +134,21 @@ export default function ReportesPage() {
     }))
   }
 
+  // 🔹 Determinar los grados disponibles según el nivel
+  const level = filters.nivelEducativo || ""
+  const gradeOptions =
+    level.toLowerCase() === "primaria"
+      ? ["1", "2", "3", "4", "5", "6"]
+      : level.toLowerCase() === "secundaria"
+        ? ["1", "2", "3", "4", "5"]
+        : [] // 🔒 si es inicial u otro, no hay grados disponibles
+
   return (
     <div>
       <h1 className="text-2xl font-bold text-gray-800 mb-6">Reporte de Opciones Múltiples</h1>
 
       <div className="bg-white rounded-lg shadow-sm p-6 mb-6">
+        {/* FILA 1: Encuesta y DRE */}
         <div className="grid grid-cols-2 gap-6 mb-6">
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">Encuesta</label>
@@ -153,6 +163,7 @@ export default function ReportesPage() {
               ))}
             </select>
           </div>
+
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">DRE</label>
             <select
@@ -160,7 +171,7 @@ export default function ReportesPage() {
               onChange={(e) => handleFilterChange("dre", e.target.value)}
               className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
             >
-              <option value="">-- Todas las DRE --</option>
+              <option value="">-- Seleccione una DRE --</option>
               {dres.map((d) => (
                 <option key={d.id} value={d.id}>{d.name}</option>
               ))}
@@ -168,21 +179,23 @@ export default function ReportesPage() {
           </div>
         </div>
 
+        {/* FILA 2: UGEL y Colegio */}
         <div className="grid grid-cols-2 gap-6 mb-6">
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">UGEL</label>
             <select
               value={filters.ugel}
               onChange={(e) => handleFilterChange("ugel", e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
               disabled={!filters.dre}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100"
             >
-              <option value="">-- Todas las UGEL --</option>
+              <option value="">-- Seleccione una UGEL --</option>
               {ugels.map((u) => (
                 <option key={u.id} value={u.id}>{u.name}</option>
               ))}
             </select>
           </div>
+
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">Colegio</label>
             <input
@@ -190,8 +203,8 @@ export default function ReportesPage() {
               value={filters.colegioNombre || ""}
               onChange={(e) => handleSearchSchool(e.target.value)}
               placeholder="Escribe el nombre del colegio..."
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
               disabled={!filters.ugel}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100"
             />
 
             {filteredSchools.length > 0 && (
@@ -208,38 +221,38 @@ export default function ReportesPage() {
               </ul>
             )}
           </div>
-
         </div>
 
+        {/* FILA 3: Nivel educativo (siempre bloqueado) y grado */}
         <div className="grid grid-cols-2 gap-6 mb-6">
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">Nivel Educativo</label>
             <select
               value={filters.nivelEducativo}
-              onChange={(e) => handleFilterChange("nivelEducativo", e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-              disabled={!!filters.nivelEducativo} // si ya viene del colegio, no permitir editar
+              disabled
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-gray-100"
             >
-              <option value="">-- Todos los Niveles --</option>
+              <option value="">-- Nivel automático --</option>
               <option value="inicial">Inicial</option>
               <option value="primaria">Primaria</option>
               <option value="secundaria">Secundaria</option>
             </select>
           </div>
+
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">Grado</label>
             <select
               value={filters.grado}
               onChange={(e) => handleFilterChange("grado", e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+              disabled={!filters.colegio || level.toLowerCase() === "inicial"} // 🔒 bloqueado si no hay colegio o si el nivel es inicial
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100"
             >
               <option value="">-- Todos los Grados --</option>
-              <option value="1">1</option>
-              <option value="2">2</option>
-              <option value="3">3</option>
-              <option value="4">4</option>
-              <option value="5">5</option>
-              <option value="6">6</option>
+              {gradeOptions.map((g) => (
+                <option key={g} value={g}>
+                  {g}
+                </option>
+              ))}
             </select>
           </div>
         </div>
@@ -254,21 +267,13 @@ export default function ReportesPage() {
         </div>
       </div>
 
+      {/* Gráficos */}
       {showCharts ? (
         <div className="grid grid-cols-2 gap-6">
-          <ChartCard
-            title="En mi colegio los y las estudiantes nos llevamos bien"
-            data={generateChartData(filters.encuesta)}
-          />
+          <ChartCard title="En mi colegio los y las estudiantes nos llevamos bien" data={generateChartData(filters.encuesta)} />
           <ChartCard title="Mis compañeros(as) se interesan por mí" data={generateChartData(filters.encuesta)} />
-          <ChartCard
-            title="Mis compañeros(as) me ayudan cuando lo necesito"
-            data={generateChartData(filters.encuesta)}
-          />
-          <ChartCard
-            title="Ayudo a mis compañeros(as) cuando lo necesitan"
-            data={generateChartData(filters.encuesta)}
-          />
+          <ChartCard title="Mis compañeros(as) me ayudan cuando lo necesito" data={generateChartData(filters.encuesta)} />
+          <ChartCard title="Ayudo a mis compañeros(as) cuando lo necesitan" data={generateChartData(filters.encuesta)} />
         </div>
       ) : (
         <div className="bg-white rounded-lg shadow-sm p-12 text-center">
