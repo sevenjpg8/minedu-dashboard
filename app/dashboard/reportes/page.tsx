@@ -43,6 +43,7 @@ export default function ReportesPage() {
     dre: "",
     ugel: "",
     colegio: "",
+    colegioNombre: "",
     nivelEducativo: "",
     grado: "",
   })
@@ -62,6 +63,7 @@ export default function ReportesPage() {
       dre: "",
       ugel: "",
       colegio: "",
+      colegioNombre: "",
       nivelEducativo: "",
       grado: "",
     })
@@ -70,7 +72,7 @@ export default function ReportesPage() {
 
   }
 
-    // Cargar encuestas y DREs al inicio
+  // Cargar encuestas y DREs al inicio
   useEffect(() => {
     fetch("/api/surveys").then((res) => res.json()).then(setSurveys)
     fetch("/api/dres").then((res) => res.json()).then(setDres)
@@ -96,6 +98,41 @@ export default function ReportesPage() {
   }, [filters.ugel])
 
   const showCharts = filters.encuesta !== ""
+
+  const [filteredSchools, setFilteredSchools] = useState<any[]>([])
+
+  const handleSearchSchool = async (value: string) => {
+    handleFilterChange("colegioNombre", value)
+    setFilteredSchools([])
+
+    if (!filters.ugel || value.length < 3) return // espera que escriba al menos 3 letras
+
+    const res = await fetch(`/api/schoolsSearch?ugelId=${filters.ugel}&query=${value}`)
+    const data = await res.json()
+    setFilteredSchools(data)
+  }
+
+  function normalizarNivel(nivel: string): string {
+    if (!nivel) return ""
+    nivel = nivel.toLowerCase()
+
+    if (nivel.includes("inicial")) return "inicial"
+    if (nivel.includes("primaria")) return "primaria"
+    if (nivel.includes("secundaria")) return "secundaria"
+
+    return ""
+  }
+
+
+  const handleSelectSchool = (school: any) => {
+    setFilteredSchools([])
+    setFilters((prev) => ({
+      ...prev,
+      colegio: school.id,
+      colegioNombre: school.name,
+      nivelEducativo: normalizarNivel(school.nivel_educativo),
+    }))
+  }
 
   return (
     <div>
@@ -148,18 +185,30 @@ export default function ReportesPage() {
           </div>
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">Colegio</label>
-            <select
-              value={filters.colegio}
-              onChange={(e) => handleFilterChange("colegio", e.target.value)}
+            <input
+              type="text"
+              value={filters.colegioNombre || ""}
+              onChange={(e) => handleSearchSchool(e.target.value)}
+              placeholder="Escribe el nombre del colegio..."
               className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
               disabled={!filters.ugel}
-            >
-              <option value="">-- Todos los Colegios --</option>
-              {schools.map((s) => (
-                <option key={s.id} value={s.id}>{s.name}</option>
-              ))}
-            </select>
+            />
+
+            {filteredSchools.length > 0 && (
+              <ul className="border rounded mt-2 max-h-60 overflow-y-auto bg-white shadow">
+                {filteredSchools.map((s) => (
+                  <li
+                    key={s.id}
+                    className="p-2 hover:bg-blue-100 cursor-pointer"
+                    onClick={() => handleSelectSchool(s)}
+                  >
+                    {s.name}
+                  </li>
+                ))}
+              </ul>
+            )}
           </div>
+
         </div>
 
         <div className="grid grid-cols-2 gap-6 mb-6">
@@ -169,8 +218,10 @@ export default function ReportesPage() {
               value={filters.nivelEducativo}
               onChange={(e) => handleFilterChange("nivelEducativo", e.target.value)}
               className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+              disabled={!!filters.nivelEducativo} // si ya viene del colegio, no permitir editar
             >
               <option value="">-- Todos los Niveles --</option>
+              <option value="inicial">Inicial</option>
               <option value="primaria">Primaria</option>
               <option value="secundaria">Secundaria</option>
             </select>
