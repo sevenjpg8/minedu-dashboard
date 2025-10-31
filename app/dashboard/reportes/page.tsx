@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from "recharts"
 
 const generateChartData = (filterId: string) => {
@@ -47,6 +47,11 @@ export default function ReportesPage() {
     grado: "",
   })
 
+  const [surveys, setSurveys] = useState<any[]>([])
+  const [dres, setDres] = useState<any[]>([])
+  const [ugels, setUgels] = useState<any[]>([])
+  const [schools, setSchools] = useState<any[]>([])
+
   const handleFilterChange = (key: string, value: string) => {
     setFilters((prev) => ({ ...prev, [key]: value }))
   }
@@ -60,7 +65,35 @@ export default function ReportesPage() {
       nivelEducativo: "",
       grado: "",
     })
+    setUgels([])
+    setSchools([])
+
   }
+
+    // Cargar encuestas y DREs al inicio
+  useEffect(() => {
+    fetch("/api/surveys").then((res) => res.json()).then(setSurveys)
+    fetch("/api/dres").then((res) => res.json()).then(setDres)
+  }, [])
+
+  // Cargar UGELs al seleccionar DRE
+  useEffect(() => {
+    if (!filters.dre) {
+      setUgels([])
+      setSchools([])
+      return
+    }
+    fetch(`/api/ugels?dreId=${filters.dre}`).then((res) => res.json()).then(setUgels)
+  }, [filters.dre])
+
+  // Cargar colegios al seleccionar UGEL
+  useEffect(() => {
+    if (!filters.ugel) {
+      setSchools([])
+      return
+    }
+    fetch(`/api/schools?ugelId=${filters.ugel}`).then((res) => res.json()).then(setSchools)
+  }, [filters.ugel])
 
   const showCharts = filters.encuesta !== ""
 
@@ -75,11 +108,12 @@ export default function ReportesPage() {
             <select
               value={filters.encuesta}
               onChange={(e) => handleFilterChange("encuesta", e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
             >
               <option value="">-- Seleccione una encuesta --</option>
-              <option value="1">Encuesta de Convivencia Escolar 2025 - Primaria</option>
-              <option value="2">Encuesta de Convivencia Escolar 2025 - Secundaria</option>
+              {surveys.map((s) => (
+                <option key={s.id} value={s.id}>{s.title}</option>
+              ))}
             </select>
           </div>
           <div>
@@ -87,11 +121,12 @@ export default function ReportesPage() {
             <select
               value={filters.dre}
               onChange={(e) => handleFilterChange("dre", e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
             >
               <option value="">-- Todas las DRE --</option>
-              <option value="1">DRE Lima</option>
-              <option value="2">DRE Arequipa</option>
+              {dres.map((d) => (
+                <option key={d.id} value={d.id}>{d.name}</option>
+              ))}
             </select>
           </div>
         </div>
@@ -102,11 +137,13 @@ export default function ReportesPage() {
             <select
               value={filters.ugel}
               onChange={(e) => handleFilterChange("ugel", e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+              disabled={!filters.dre}
             >
               <option value="">-- Todas las UGEL --</option>
-              <option value="1">UGEL 01</option>
-              <option value="2">UGEL 02</option>
+              {ugels.map((u) => (
+                <option key={u.id} value={u.id}>{u.name}</option>
+              ))}
             </select>
           </div>
           <div>
@@ -114,11 +151,13 @@ export default function ReportesPage() {
             <select
               value={filters.colegio}
               onChange={(e) => handleFilterChange("colegio", e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+              disabled={!filters.ugel}
             >
               <option value="">-- Todos los Colegios --</option>
-              <option value="1">Colegio Nacional 1</option>
-              <option value="2">Colegio Nacional 2</option>
+              {schools.map((s) => (
+                <option key={s.id} value={s.id}>{s.name}</option>
+              ))}
             </select>
           </div>
         </div>
@@ -144,12 +183,12 @@ export default function ReportesPage() {
               className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
             >
               <option value="">-- Todos los Grados --</option>
-              <option value="1">1er Grado</option>
-              <option value="2">2do Grado</option>
-              <option value="3">3er Grado</option>
-              <option value="4">4to Grado</option>
-              <option value="5">5to Grado</option>
-              <option value="6">6to Grado</option>
+              <option value="1">1</option>
+              <option value="2">2</option>
+              <option value="3">3</option>
+              <option value="4">4</option>
+              <option value="5">5</option>
+              <option value="6">6</option>
             </select>
           </div>
         </div>
