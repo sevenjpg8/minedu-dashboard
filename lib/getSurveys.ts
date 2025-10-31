@@ -1,4 +1,3 @@
-// lib/getSurveys.ts
 import { supabase } from "@/lib/supabaseClient"
 
 export interface Survey {

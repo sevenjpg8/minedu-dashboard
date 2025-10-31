@@ -1,48 +1,80 @@
-//dashboard/encuestas/page.tsx
 "use client"
 
-import { useEffect, useState } from "react"
-import { Trash2, Edit2, X, Plus } from "lucide-react"
-import { supabase } from "@/lib/supabaseClient"
-import { getSurveys, type Survey as SurveyBase } from "@/lib/getSurveys"
+import type React from "react"
 
-interface Question {
+import { useState } from "react"
+import { Trash2, Edit2, X, Plus, GripVertical, Settings } from "lucide-react"
+
+interface Answer {
   id: number
   text: string
 }
 
-interface Survey extends SurveyBase {
+interface Question {
+  id: number
+  text: string
+  answers?: Answer[]
+}
+
+interface Survey {
+  id: number
+  title: string
+  description: string
+  status: "Activa" | "Inactiva"
+  startDate: string
+  endDate: string
   questions?: Question[]
 }
 
 export default function EncuestasPage() {
-  const [surveys, setSurveys] = useState<Survey[]>([])
-  const [loading, setLoading] = useState(true)
+  const [surveys, setSurveys] = useState<Survey[]>([
+    {
+      id: 1,
+      title: "dsasdsad",
+      description: "sadasd",
+      status: "Activa",
+      startDate: "11/10/2025",
+      endDate: "14/10/2025",
+      questions: [],
+    },
+    {
+      id: 2,
+      title: "Encuesta de Convivencia Escolar 2025 - Primaria",
+      description: "Queremos saber cómo te sientes en tu colegio. ¡Tus...",
+      status: "Activa",
+      startDate: "09/10/2025",
+      endDate: "09/11/2025",
+      questions: [],
+    },
+    {
+      id: 3,
+      title: "Encuesta de Convivencia Escolar 2025 - Secundaria",
+      description: "Tu opinión es fundamental para mejorar la conviven...",
+      status: "Activa",
+      startDate: "09/10/2025",
+      endDate: "09/11/2025",
+      questions: [],
+    },
+  ])
+
   const [showModal, setShowModal] = useState(false)
+  const [showQuestionsModal, setShowQuestionsModal] = useState(false)
+  const [showAnswersModal, setShowAnswersModal] = useState(false)
   const [editingId, setEditingId] = useState<number | null>(null)
+  const [selectedQuestionId, setSelectedQuestionId] = useState<number | null>(null)
   const [formData, setFormData] = useState({
     title: "",
     description: "",
-    starts_at: "",
-    ends_at: "",
-    is_active: false,
+    startDate: "",
+    endDate: "",
+    active: false,
   })
   const [questions, setQuestions] = useState<Question[]>([])
   const [newQuestion, setNewQuestion] = useState("")
-
-  useEffect(() => {
-    const fetchSurveys = async () => {
-      const data = await getSurveys()
-      const formatted = data.map((s) => ({
-        ...s,
-        questions: [],
-      }))
-      setSurveys(formatted)
-      setLoading(false)
-    }
-
-    fetchSurveys()
-  }, [])
+  const [draggedIndex, setDraggedIndex] = useState<number | null>(null)
+  const [answers, setAnswers] = useState<Answer[]>([])
+  const [newAnswer, setNewAnswer] = useState("")
+  const [draggedAnswerIndex, setDraggedAnswerIndex] = useState<number | null>(null)
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { name, value, type } = e.target as HTMLInputElement
@@ -52,39 +84,29 @@ export default function EncuestasPage() {
     }))
   }
 
-  const handleEdit = async (survey: Survey) => {
+  const handleEdit = (survey: Survey) => {
     setEditingId(survey.id)
     setFormData({
       title: survey.title,
       description: survey.description,
-      starts_at: survey.starts_at,
-      ends_at: survey.ends_at,
-      is_active: survey.is_active,
+      startDate: survey.startDate,
+      endDate: survey.endDate,
+      active: survey.status === "Activa",
     })
-
-    // 🔹 Obtener preguntas reales de esta encuesta
-    const { data: preguntas, error } = await supabase
-      .from("questions")
-      .select("id, text")
-      .eq("survey_id", survey.id)
-      .order("id", { ascending: true })
-
-    if (!error && preguntas) {
-      setQuestions(preguntas)
-    } else {
-      console.error("Error cargando preguntas:", error)
-      setQuestions([])
-    }
-
+    setQuestions(survey.questions || [])
     setShowModal(true)
   }
 
+  const handleOpenQuestionsModal = () => {
+    setShowQuestionsModal(true)
+  }
 
   const handleAddQuestion = () => {
     if (newQuestion.trim()) {
       const question: Question = {
         id: questions.length + 1,
         text: newQuestion,
+        answers: [],
       }
       setQuestions([...questions, question])
       setNewQuestion("")
@@ -95,77 +117,114 @@ export default function EncuestasPage() {
     setQuestions(questions.filter((q) => q.id !== id))
   }
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
-
-    if (editingId) {
-      // 🔹 Actualizar encuesta existente
-      const { error: updateError } = await supabase
-        .from("surveys")
-        .update({
-          title: formData.title,
-          description: formData.description,
-          starts_at: formData.starts_at,
-          ends_at: formData.ends_at,
-          is_active: formData.is_active,
-        })
-        .eq("id", editingId)
-
-      if (updateError) {
-        console.error("Error actualizando encuesta:", updateError)
-        return
-      }
-
-      // 🔹 Actualizar preguntas (borrar y volver a insertar)
-      await supabase.from("questions").delete().eq("survey_id", editingId)
-      if (questions.length > 0) {
-        const nuevasPreguntas = questions.map((q) => ({
-          survey_id: editingId,
-          text: q.text,
-          type: "multiple_choice", // tipo genérico por defecto
-          order: q.id,
-        }))
-        await supabase.from("questions").insert(nuevasPreguntas)
-      }
-    } else {
-      // 🔹 Crear encuesta nueva
-      const { data: nuevaEncuesta, error: insertError } = await supabase
-        .from("surveys")
-        .insert([
-          {
-            title: formData.title,
-            description: formData.description,
-            starts_at: formData.starts_at,
-            ends_at: formData.ends_at,
-            is_active: formData.is_active,
-            unique_link_slug: crypto.randomUUID(),
-          },
-        ])
-        .select("id")
-        .single()
-
-      if (insertError) {
-        console.error("Error insertando encuesta:", insertError)
-        return
-      }
-
-      if (nuevaEncuesta && questions.length > 0) {
-        const preguntasConId = questions.map((q) => ({
-          survey_id: nuevaEncuesta.id,
-          text: q.text,
-          type: "multiple_choice",
-          order: q.id,
-        }))
-        await supabase.from("questions").insert(preguntasConId)
-      }
-    }
-
-    // Refrescar lista
-    const refreshed = await getSurveys()
-    setSurveys(refreshed)
-    handleCloseModal()
+  const handleOpenAnswersModal = (questionId: number) => {
+    setSelectedQuestionId(questionId)
+    const selectedQuestion = questions.find((q) => q.id === questionId)
+    setAnswers(selectedQuestion?.answers || [])
+    setShowAnswersModal(true)
   }
 
+  const handleAddAnswer = () => {
+    if (newAnswer.trim()) {
+      const answer: Answer = {
+        id: answers.length + 1,
+        text: newAnswer,
+      }
+      setAnswers([...answers, answer])
+      setNewAnswer("")
+    }
+  }
+
+  const handleDeleteAnswer = (id: number) => {
+    setAnswers(answers.filter((a) => a.id !== id))
+  }
+
+  const handleSaveAnswers = () => {
+    if (selectedQuestionId) {
+      const updatedQuestions = questions.map((q) => (q.id === selectedQuestionId ? { ...q, answers } : q))
+      setQuestions(updatedQuestions)
+      setShowAnswersModal(false)
+      setSelectedQuestionId(null)
+      setAnswers([])
+      setNewAnswer("")
+    }
+  }
+
+  const handleDragStart = (index: number) => {
+    setDraggedIndex(index)
+  }
+
+  const handleDragOver = (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault()
+  }
+
+  const handleDrop = (index: number) => {
+    if (draggedIndex === null || draggedIndex === index) {
+      setDraggedIndex(null)
+      return
+    }
+
+    const newQuestions = [...questions]
+    const draggedQuestion = newQuestions[draggedIndex]
+    newQuestions.splice(draggedIndex, 1)
+    newQuestions.splice(index, 0, draggedQuestion)
+    setQuestions(newQuestions)
+    setDraggedIndex(null)
+  }
+
+  const handleDragStartAnswer = (index: number) => {
+    setDraggedAnswerIndex(index)
+  }
+
+  const handleDropAnswer = (index: number) => {
+    if (draggedAnswerIndex === null || draggedAnswerIndex === index) {
+      setDraggedAnswerIndex(null)
+      return
+    }
+
+    const newAnswers = [...answers]
+    const draggedAnswer = newAnswers[draggedAnswerIndex]
+    newAnswers.splice(draggedAnswerIndex, 1)
+    newAnswers.splice(index, 0, draggedAnswer)
+    setAnswers(newAnswers)
+    setDraggedAnswerIndex(null)
+  }
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault()
+    if (editingId) {
+      setSurveys(
+        surveys.map((survey) =>
+          survey.id === editingId
+            ? {
+                ...survey,
+                title: formData.title,
+                description: formData.description,
+                status: formData.active ? "Activa" : "Inactiva",
+                startDate: formData.startDate,
+                endDate: formData.endDate,
+                questions: questions,
+              }
+            : survey,
+        ),
+      )
+    } else {
+      const newSurvey: Survey = {
+        id: surveys.length + 1,
+        title: formData.title,
+        description: formData.description,
+        status: formData.active ? "Activa" : "Inactiva",
+        startDate: formData.startDate,
+        endDate: formData.endDate,
+        questions: questions,
+      }
+      setSurveys([...surveys, newSurvey])
+    }
+    setFormData({ title: "", description: "", startDate: "", endDate: "", active: false })
+    setQuestions([])
+    setEditingId(null)
+    setShowModal(false)
+  }
 
   const handleDelete = (id: number) => {
     setSurveys(surveys.filter((survey) => survey.id !== id))
@@ -174,7 +233,7 @@ export default function EncuestasPage() {
   const handleCloseModal = () => {
     setShowModal(false)
     setEditingId(null)
-    setFormData({ title: "", description: "", starts_at: "", ends_at: "", is_active: false })
+    setFormData({ title: "", description: "", startDate: "", endDate: "", active: false })
     setQuestions([])
     setNewQuestion("")
   }
@@ -195,7 +254,7 @@ export default function EncuestasPage() {
         <table className="w-full">
           <thead className="bg-gray-50 border-b border-gray-200">
             <tr>
-              <th className="px-6 py-3 text-left text-sm font-semibold text-gray-700">TÍTULO</th>
+              <th className="px-6 py-3 text-left text-sm font-semibold text-gray-700">TITULO</th>
               <th className="px-6 py-3 text-left text-sm font-semibold text-gray-700">ESTADO</th>
               <th className="px-6 py-3 text-left text-sm font-semibold text-gray-700">FECHAS</th>
               <th className="px-6 py-3 text-left text-sm font-semibold text-gray-700">ACCIONES</th>
@@ -205,21 +264,19 @@ export default function EncuestasPage() {
             {surveys.map((survey) => (
               <tr key={survey.id} className="border-b border-gray-200 hover:bg-gray-50">
                 <td className="px-6 py-4">
-                  <p className="text-gray-900 font-medium">{survey.title}</p>
-                  <p className="text-gray-600 text-sm">{survey.description}</p>
+                  <div>
+                    <p className="text-gray-900 font-medium">{survey.title}</p>
+                    <p className="text-gray-600 text-sm">{survey.description}</p>
+                  </div>
                 </td>
                 <td className="px-6 py-4">
-                  <span
-                    className={`inline-block ${
-                      survey.is_active ? "bg-green-100 text-green-800" : "bg-gray-100 text-gray-600"
-                    } text-xs font-semibold px-3 py-1 rounded-full`}
-                  >
-                    {survey.is_active ? "Activa" : "Inactiva"}
+                  <span className="inline-block bg-green-100 text-green-800 text-xs font-semibold px-3 py-1 rounded-full">
+                    {survey.status}
                   </span>
                 </td>
                 <td className="px-6 py-4 text-gray-600 text-sm">
-                  <p>Inicio: {survey.starts_at}</p>
-                  <p>Fin: {survey.ends_at}</p>
+                  <p>Inicio: {survey.startDate}</p>
+                  <p>Fin: {survey.endDate}</p>
                 </td>
                 <td className="px-6 py-4">
                   <div className="flex gap-3">
@@ -245,9 +302,8 @@ export default function EncuestasPage() {
         </table>
       </div>
 
-      {/* MODAL DE CREAR/EDITAR */}
       {showModal && (
-        <div className="fixed inset-0 bg-[rgba(0,0,0,0.50)] flex items-center justify-center z-50 p-4">
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-lg shadow-lg max-w-2xl w-full max-h-[90vh] overflow-y-auto">
             <div className="flex items-center justify-between p-6 border-b border-gray-200 sticky top-0 bg-white">
               <h2 className="text-xl font-bold text-gray-800">
@@ -290,8 +346,8 @@ export default function EncuestasPage() {
                   <label className="block text-sm font-medium text-gray-700 mb-2">Fecha de Inicio</label>
                   <input
                     type="date"
-                    name="starts_at"
-                    value={formData.starts_at}
+                    name="startDate"
+                    value={formData.startDate}
                     onChange={handleInputChange}
                     required
                     className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
@@ -301,8 +357,8 @@ export default function EncuestasPage() {
                   <label className="block text-sm font-medium text-gray-700 mb-2">Fecha de Fin</label>
                   <input
                     type="date"
-                    name="ends_at"
-                    value={formData.ends_at}
+                    name="endDate"
+                    value={formData.endDate}
                     onChange={handleInputChange}
                     required
                     className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
@@ -313,53 +369,70 @@ export default function EncuestasPage() {
               <div className="flex items-center gap-2">
                 <input
                   type="checkbox"
-                  name="is_active"
-                  id="is_active"
-                  checked={formData.is_active}
+                  name="active"
+                  id="active"
+                  checked={formData.active}
                   onChange={handleInputChange}
                   className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-2 focus:ring-blue-500"
                 />
-                <label htmlFor="is_active" className="text-sm font-medium text-gray-700">
+                <label htmlFor="active" className="text-sm font-medium text-gray-700">
                   Activa
                 </label>
               </div>
 
-              {/* Sección de preguntas */}
               <div className="border-t border-gray-200 pt-4">
-                <h3 className="text-lg font-semibold text-gray-800 mb-4">Preguntas</h3>
-
-                <div className="space-y-3 mb-4">
-                  {questions.map((question) => (
-                    <div key={question.id} className="flex items-center justify-between bg-gray-50 p-3 rounded-lg">
-                      <p className="text-gray-700">{question.text}</p>
-                      <button
-                        type="button"
-                        onClick={() => handleDeleteQuestion(question.id)}
-                        className="text-red-600 hover:text-red-800"
-                      >
-                        <Trash2 size={18} />
-                      </button>
-                    </div>
-                  ))}
-                </div>
-
-                <div className="flex gap-2">
-                  <input
-                    type="text"
-                    value={newQuestion}
-                    onChange={(e) => setNewQuestion(e.target.value)}
-                    onKeyDown={(e) => e.key === "Enter" && (e.preventDefault(), handleAddQuestion())}
-                    placeholder="Ingrese una nueva pregunta"
-                    className="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  />
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="text-lg font-semibold text-gray-800">Preguntas ({questions.length})</h3>
                   <button
                     type="button"
-                    onClick={handleAddQuestion}
+                    onClick={handleOpenQuestionsModal}
                     className="bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-4 rounded-lg transition-colors flex items-center gap-2"
                   >
                     <Plus size={18} />
-                    Añadir
+                    Añadir Pregunta
                   </button>
+                </div>
+
+                <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 mb-4">
+                  <p className="text-sm text-amber-700">
+                    💡 <span className="font-semibold">Tip:</span> Si te equivocaste en el orden de las preguntas, haz
+                    clic en "Añadir Pregunta" para cambiar el orden arrastrándolas.
+                  </p>
+                </div>
+
+                <div className="space-y-2">
+                  {questions.map((question, index) => (
+                    <div key={question.id} className="flex items-center justify-between bg-gray-50 p-3 rounded-lg">
+                      <div className="flex-1">
+                        <p className="text-gray-700">
+                          {index + 1}. {question.text}
+                        </p>
+                        {question.answers && question.answers.length > 0 && (
+                          <p className="text-xs text-gray-500 mt-1">{question.answers.length} opciones de respuesta</p>
+                        )}
+                      </div>
+                      <div className="flex gap-2">
+                        <button
+                          type="button"
+                          onClick={() => handleOpenAnswersModal(question.id)}
+                          className="text-blue-600 hover:text-blue-800 p-1"
+                          title="Gestionar respuestas"
+                        >
+                          <Settings size={18} />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleDeleteQuestion(question.id)}
+                          className="text-red-600 hover:text-red-800"
+                        >
+                          <Trash2 size={18} />
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                  {questions.length === 0 && (
+                    <p className="text-gray-500 text-center py-4">No hay preguntas añadidas aún</p>
+                  )}
                 </div>
               </div>
 
@@ -379,6 +452,258 @@ export default function EncuestasPage() {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {showQuestionsModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[60] p-4">
+          <div className="bg-white rounded-lg shadow-lg max-w-2xl w-full">
+            <style>{`
+              @keyframes slideIn {
+                from {
+                  opacity: 0;
+                  transform: translateY(-10px);
+                }
+                to {
+                  opacity: 1;
+                  transform: translateY(0);
+                }
+              }
+
+              @keyframes smoothMove {
+                0% {
+                  transform: translateY(0);
+                }
+                100% {
+                  transform: translateY(var(--move-distance, 0px));
+                }
+              }
+
+              .question-item {
+                transition: all 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+                animation: slideIn 0.2s ease-out;
+              }
+
+              .question-item.dragging {
+                opacity: 0.4;
+                transform: scale(0.95);
+              }
+
+              .question-item.drag-over {
+                transform: translateY(-8px);
+              }
+            `}</style>
+
+            <div className="flex items-center justify-between p-6 border-b border-gray-200">
+              <h2 className="text-xl font-bold text-gray-800">Gestionar Preguntas</h2>
+              <button onClick={() => setShowQuestionsModal(false)} className="text-gray-500 hover:text-gray-700">
+                <X size={24} />
+              </button>
+            </div>
+
+            <div className="p-6 space-y-4">
+              <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 mb-4">
+                <p className="text-sm text-blue-700">
+                  💡 <span className="font-semibold">Tip:</span> Puede desplazar o mover el orden de las preguntas
+                  arrastrando desde el icono de agarre (≡) a la izquierda de cada pregunta.
+                </p>
+              </div>
+
+              <div className="space-y-2 max-h-[50vh] overflow-y-auto">
+                {questions.length > 0 ? (
+                  questions.map((question, index) => (
+                    <div
+                      key={question.id}
+                      draggable
+                      onDragStart={() => handleDragStart(index)}
+                      onDragOver={handleDragOver}
+                      onDrop={() => handleDrop(index)}
+                      className={`question-item flex items-start justify-between bg-gradient-to-r from-blue-50 to-blue-25 p-4 rounded-lg border border-blue-200 cursor-move hover:shadow-md ${
+                        draggedIndex === index ? "dragging" : ""
+                      }`}
+                    >
+                      <div className="flex items-start gap-3 flex-1">
+                        <GripVertical
+                          size={20}
+                          className="text-blue-600 mt-1 flex-shrink-0 opacity-60 hover:opacity-100 transition-opacity"
+                        />
+                        <div>
+                          <p className="text-sm font-semibold text-blue-600 mb-1">Pregunta {index + 1}</p>
+                          <p className="text-gray-800">{question.text}</p>
+                        </div>
+                      </div>
+                      <button
+                        onClick={() => handleDeleteQuestion(question.id)}
+                        className="text-red-600 hover:text-red-800 ml-4 mt-1 flex-shrink-0 transition-colors"
+                      >
+                        <Trash2 size={20} />
+                      </button>
+                    </div>
+                  ))
+                ) : (
+                  <p className="text-gray-500 text-center py-8">No hay preguntas añadidas aún</p>
+                )}
+              </div>
+
+              <div className="border-t border-gray-200 pt-4">
+                <label className="block text-sm font-medium text-gray-700 mb-2">Nueva Pregunta</label>
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    value={newQuestion}
+                    onChange={(e) => setNewQuestion(e.target.value)}
+                    onKeyPress={(e) => e.key === "Enter" && handleAddQuestion()}
+                    placeholder="Escriba la pregunta y presione Enter o haga clic en Añadir"
+                    className="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                  <button
+                    type="button"
+                    onClick={handleAddQuestion}
+                    className="bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-4 rounded-lg transition-colors flex items-center gap-2 whitespace-nowrap"
+                  >
+                    <Plus size={18} />
+                    Añadir
+                  </button>
+                </div>
+              </div>
+
+              <div className="flex justify-end gap-3 pt-4 border-t border-gray-200">
+                <button
+                  onClick={() => setShowQuestionsModal(false)}
+                  className="bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-6 rounded-lg transition-colors"
+                >
+                  Listo
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showAnswersModal && selectedQuestionId && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[70] p-4">
+          <div className="bg-white rounded-lg shadow-lg max-w-2xl w-full">
+            <style>{`
+              .answer-item {
+                transition: all 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+                animation: slideIn 0.2s ease-out;
+              }
+
+              .answer-item.dragging {
+                opacity: 0.4;
+                transform: scale(0.95);
+              }
+
+              @keyframes slideIn {
+                from {
+                  opacity: 0;
+                  transform: translateY(-10px);
+                }
+                to {
+                  opacity: 1;
+                  transform: translateY(0);
+                }
+              }
+            `}</style>
+
+            <div className="flex items-center justify-between p-6 border-b border-gray-200">
+              <h2 className="text-xl font-bold text-gray-800">Opciones de Respuesta</h2>
+              <button
+                onClick={() => {
+                  setShowAnswersModal(false)
+                  setSelectedQuestionId(null)
+                }}
+                className="text-gray-500 hover:text-gray-700"
+              >
+                <X size={24} />
+              </button>
+            </div>
+
+            <div className="p-6 space-y-4">
+              <div className="bg-green-50 border border-green-200 rounded-lg p-3 mb-4">
+                <p className="text-sm text-green-700">
+                  💡 <span className="font-semibold">Tip:</span> Agregue las opciones de respuesta para esta pregunta.
+                  Puede desplazarlas para cambiar el orden.
+                </p>
+              </div>
+
+              <div className="space-y-2 max-h-[50vh] overflow-y-auto">
+                {answers.length > 0 ? (
+                  answers.map((answer, index) => (
+                    <div
+                      key={answer.id}
+                      draggable
+                      onDragStart={() => handleDragStartAnswer(index)}
+                      onDragOver={handleDragOver}
+                      onDrop={() => handleDropAnswer(index)}
+                      className={`answer-item flex items-start justify-between bg-gradient-to-r from-green-50 to-green-25 p-4 rounded-lg border border-green-200 cursor-move hover:shadow-md ${
+                        draggedAnswerIndex === index ? "dragging" : ""
+                      }`}
+                    >
+                      <div className="flex items-start gap-3 flex-1">
+                        <GripVertical
+                          size={20}
+                          className="text-green-600 mt-1 flex-shrink-0 opacity-60 hover:opacity-100 transition-opacity"
+                        />
+                        <div>
+                          <p className="text-sm font-semibold text-green-600 mb-1">Opción {index + 1}</p>
+                          <p className="text-gray-800">{answer.text}</p>
+                        </div>
+                      </div>
+                      <button
+                        onClick={() => handleDeleteAnswer(answer.id)}
+                        className="text-red-600 hover:text-red-800 ml-4 mt-1 flex-shrink-0 transition-colors"
+                      >
+                        <Trash2 size={20} />
+                      </button>
+                    </div>
+                  ))
+                ) : (
+                  <p className="text-gray-500 text-center py-8">No hay opciones de respuesta añadidas aún</p>
+                )}
+              </div>
+
+              <div className="border-t border-gray-200 pt-4">
+                <label className="block text-sm font-medium text-gray-700 mb-2">Nueva Opción de Respuesta</label>
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    value={newAnswer}
+                    onChange={(e) => setNewAnswer(e.target.value)}
+                    onKeyPress={(e) => e.key === "Enter" && handleAddAnswer()}
+                    placeholder="Escriba la opción y presione Enter o haga clic en Añadir"
+                    className="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
+                  />
+                  <button
+                    type="button"
+                    onClick={handleAddAnswer}
+                    className="bg-green-600 hover:bg-green-700 text-white font-medium py-2 px-4 rounded-lg transition-colors flex items-center gap-2 whitespace-nowrap"
+                  >
+                    <Plus size={18} />
+                    Añadir
+                  </button>
+                </div>
+              </div>
+
+              <div className="flex justify-end gap-3 pt-4 border-t border-gray-200">
+                <button
+                  onClick={() => {
+                    setShowAnswersModal(false)
+                    setSelectedQuestionId(null)
+                  }}
+                  className="bg-gray-200 hover:bg-gray-300 text-gray-800 font-medium py-2 px-6 rounded-lg transition-colors"
+                >
+                  Cancelar
+                </button>
+                <button
+                  onClick={handleSaveAnswers}
+                  className="bg-green-600 hover:bg-green-700 text-white font-medium py-2 px-6 rounded-lg transition-colors"
+                >
+                  Guardar Opciones
+                </button>
+              </div>
+            </div>
           </div>
         </div>
       )}
