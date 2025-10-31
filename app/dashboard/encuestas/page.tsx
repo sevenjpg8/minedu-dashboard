@@ -12,7 +12,9 @@ interface Answer {
 
 interface Question {
   id: number
+  prefix?: string | null
   text: string
+  description?: string
   answers?: Answer[]
 }
 
@@ -60,8 +62,14 @@ export default function EncuestasPage() {
   const [showModal, setShowModal] = useState(false)
   const [showQuestionsModal, setShowQuestionsModal] = useState(false)
   const [showAnswersModal, setShowAnswersModal] = useState(false)
+  const [showEditQuestionModal, setShowEditQuestionModal] = useState(false)
+  const [newQuestionPrefix, setNewQuestionPrefix] = useState("")
   const [editingId, setEditingId] = useState<number | null>(null)
+  const [editingQuestionId, setEditingQuestionId] = useState<number | null>(null)
   const [selectedQuestionId, setSelectedQuestionId] = useState<number | null>(null)
+  const [editingQuestionText, setEditingQuestionText] = useState("")
+  const [editingQuestionPrefix, setEditingQuestionPrefix] = useState("")
+  const [editingQuestionDescription, setEditingQuestionDescription] = useState("")
   const [formData, setFormData] = useState({
     title: "",
     description: "",
@@ -71,6 +79,7 @@ export default function EncuestasPage() {
   })
   const [questions, setQuestions] = useState<Question[]>([])
   const [newQuestion, setNewQuestion] = useState("")
+  const [newQuestionDescription, setNewQuestionDescription] = useState("")
   const [draggedIndex, setDraggedIndex] = useState<number | null>(null)
   const [answers, setAnswers] = useState<Answer[]>([])
   const [newAnswer, setNewAnswer] = useState("")
@@ -101,15 +110,48 @@ export default function EncuestasPage() {
     setShowQuestionsModal(true)
   }
 
+  const handleOpenEditQuestionModal = (question: Question) => {
+    setEditingQuestionId(question.id)
+    setEditingQuestionText(question.text)
+    setEditingQuestionPrefix(question.prefix || "")
+    setEditingQuestionDescription(question.description || "")
+    setShowEditQuestionModal(true)
+  }
+
+  const handleSaveEditedQuestion = () => {
+    if (editingQuestionId && editingQuestionText.trim()) {
+      const updatedQuestions = questions.map((q) =>
+        q.id === editingQuestionId
+          ? {
+              ...q,
+              text: editingQuestionText,
+              prefix: editingQuestionPrefix.trim() || null,
+              description: editingQuestionDescription,
+            }
+          : q,
+      )
+      setQuestions(updatedQuestions)
+      setShowEditQuestionModal(false)
+      setEditingQuestionId(null)
+      setEditingQuestionText("")
+      setEditingQuestionPrefix("")
+      setEditingQuestionDescription("")
+    }
+  }
+
   const handleAddQuestion = () => {
     if (newQuestion.trim()) {
       const question: Question = {
-        id: questions.length + 1,
+        id: Date.now(),
         text: newQuestion,
+        description: newQuestionDescription,
+        prefix: newQuestionPrefix.trim() || null,
         answers: [],
       }
       setQuestions([...questions, question])
       setNewQuestion("")
+      setNewQuestionDescription("")
+      setNewQuestionPrefix("")
     }
   }
 
@@ -127,7 +169,7 @@ export default function EncuestasPage() {
   const handleAddAnswer = () => {
     if (newAnswer.trim()) {
       const answer: Answer = {
-        id: answers.length + 1,
+        id: Date.now(),
         text: newAnswer,
       }
       setAnswers([...answers, answer])
@@ -190,40 +232,48 @@ export default function EncuestasPage() {
     setDraggedAnswerIndex(null)
   }
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (editingId) {
-      setSurveys(
-        surveys.map((survey) =>
-          survey.id === editingId
-            ? {
-                ...survey,
-                title: formData.title,
-                description: formData.description,
-                status: formData.active ? "Activa" : "Inactiva",
-                startDate: formData.startDate,
-                endDate: formData.endDate,
-                questions: questions,
-              }
-            : survey,
-        ),
-      )
-    } else {
-      const newSurvey: Survey = {
-        id: surveys.length + 1,
+
+    try {
+      const payload = {
         title: formData.title,
         description: formData.description,
-        status: formData.active ? "Activa" : "Inactiva",
         startDate: formData.startDate,
         endDate: formData.endDate,
-        questions: questions,
+        active: formData.active,
+        questions: questions.map((q) => ({
+          prefix: q.prefix ?? null,
+          text: q.text,
+          answers:
+            q.answers?.map((a) => ({
+              text: a.text,
+            })) ?? [],
+        })),
       }
-      setSurveys([...surveys, newSurvey])
+
+      console.log("Enviando encuesta:", payload)
+
+      const response = await fetch("/api/surveyscreate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      })
+
+      const result = await response.json()
+
+      if (result.success) {
+        alert("✅ Encuesta guardada correctamente")
+        setShowModal(false)
+        setFormData({ title: "", description: "", startDate: "", endDate: "", active: false })
+        setQuestions([])
+      } else {
+        alert("❌ Error al guardar la encuesta: " + result.error)
+      }
+    } catch (err) {
+      console.error(err)
+      alert("❌ Error inesperado al guardar")
     }
-    setFormData({ title: "", description: "", startDate: "", endDate: "", active: false })
-    setQuestions([])
-    setEditingId(null)
-    setShowModal(false)
   }
 
   const handleDelete = (id: number) => {
@@ -236,6 +286,7 @@ export default function EncuestasPage() {
     setFormData({ title: "", description: "", startDate: "", endDate: "", active: false })
     setQuestions([])
     setNewQuestion("")
+    setNewQuestionDescription("")
   }
 
   return (
@@ -303,7 +354,7 @@ export default function EncuestasPage() {
       </div>
 
       {showModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+        <div className="fixed inset-0 bg-[rgba(0,0,0,0.50)]  flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-lg shadow-lg max-w-2xl w-full max-h-[90vh] overflow-y-auto">
             <div className="flex items-center justify-between p-6 border-b border-gray-200 sticky top-0 bg-white">
               <h2 className="text-xl font-bold text-gray-800">
@@ -395,8 +446,8 @@ export default function EncuestasPage() {
 
                 <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 mb-4">
                   <p className="text-sm text-amber-700">
-                    💡 <span className="font-semibold">Tip:</span> Si te equivocaste en el orden de las preguntas, haz
-                    clic en "Añadir Pregunta" para cambiar el orden arrastrándolas.
+                    💡 <span className="font-semibold">Tip:</span> Si quieres volver a editar el orden o descripcion de
+                    la pregunta, haz clic en "Añadir Pregunta".
                   </p>
                 </div>
 
@@ -412,6 +463,14 @@ export default function EncuestasPage() {
                         )}
                       </div>
                       <div className="flex gap-2">
+                        <button
+                          type="button"
+                          onClick={() => handleOpenEditQuestionModal(question)}
+                          className="text-blue-600 hover:text-blue-800 p-1"
+                          title="Editar pregunta"
+                        >
+                          <Edit2 size={18} />
+                        </button>
                         <button
                           type="button"
                           onClick={() => handleOpenAnswersModal(question.id)}
@@ -457,7 +516,7 @@ export default function EncuestasPage() {
       )}
 
       {showQuestionsModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[60] p-4">
+        <div className="fixed inset-0 bg-[rgba(0,0,0,0.50)]  flex items-center justify-center z-[60] p-4">
           <div className="bg-white rounded-lg shadow-lg max-w-2xl w-full">
             <style>{`
               @keyframes slideIn {
@@ -534,8 +593,14 @@ export default function EncuestasPage() {
                         </div>
                       </div>
                       <button
+                        onClick={() => handleOpenEditQuestionModal(question)}
+                        className="text-blue-600 hover:text-blue-800 ml-4 mt-1 flex-shrink-0 transition-colors"
+                      >
+                        <Edit2 size={20} />
+                      </button>
+                      <button
                         onClick={() => handleDeleteQuestion(question.id)}
-                        className="text-red-600 hover:text-red-800 ml-4 mt-1 flex-shrink-0 transition-colors"
+                        className="text-red-600 hover:text-red-800 ml-2 mt-1 flex-shrink-0 transition-colors"
                       >
                         <Trash2 size={20} />
                       </button>
@@ -548,19 +613,26 @@ export default function EncuestasPage() {
 
               <div className="border-t border-gray-200 pt-4">
                 <label className="block text-sm font-medium text-gray-700 mb-2">Nueva Pregunta</label>
-                <div className="flex gap-2">
+                <div className="space-y-2">
                   <input
                     type="text"
                     value={newQuestion}
                     onChange={(e) => setNewQuestion(e.target.value)}
                     onKeyPress={(e) => e.key === "Enter" && handleAddQuestion()}
-                    placeholder="Escriba la pregunta y presione Enter o haga clic en Añadir"
-                    className="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    placeholder="Escriba la pregunta"
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                  <input
+                    type="text"
+                    placeholder="Escriba el prefijo o tema de la pregunta (por ejemplo: Relaciones entre compañeros)"
+                    value={newQuestionPrefix}
+                    onChange={(e) => setNewQuestionPrefix(e.target.value)}
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                   />
                   <button
                     type="button"
                     onClick={handleAddQuestion}
-                    className="bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-4 rounded-lg transition-colors flex items-center gap-2 whitespace-nowrap"
+                    className="w-full bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-4 rounded-lg transition-colors flex items-center justify-center gap-2"
                   >
                     <Plus size={18} />
                     Añadir
@@ -581,8 +653,72 @@ export default function EncuestasPage() {
         </div>
       )}
 
+      {showEditQuestionModal && editingQuestionId && (
+        <div className="fixed inset-0 bg-[rgba(0,0,0,0.50)] flex items-center justify-end z-[70] p-4">
+          <div className="bg-white rounded-lg shadow-lg w-full max-w-md max-h-[90vh] overflow-y-auto slide-in-from-right">
+            <div className="flex items-center justify-between p-6 border-b border-gray-200 sticky top-0 bg-white">
+              <div className="flex items-center gap-2">
+                <Edit2 size={20} className="text-blue-600" />
+                <h2 className="text-lg font-bold text-gray-800">Editar Pregunta</h2>
+              </div>
+              <button
+                onClick={() => {
+                  setShowEditQuestionModal(false)
+                  setEditingQuestionId(null)
+                }}
+                className="text-gray-500 hover:text-gray-700"
+              >
+                <X size={24} />
+              </button>
+            </div>
+
+            <div className="p-6 space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Pregunta</label>
+                <input
+                  type="text"
+                  value={editingQuestionText}
+                  onChange={(e) => setEditingQuestionText(e.target.value)}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  placeholder="Texto de la pregunta"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Prefijo o Tema</label>
+                <textarea
+                  value={editingQuestionPrefix}
+                  onChange={(e) => setEditingQuestionPrefix(e.target.value)}
+                  rows={3}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  placeholder="Descripción adicional - por ejemplo: Relaciones entre compañeros"
+                />
+              </div>
+
+              <div className="flex gap-3 pt-4 border-t border-gray-200">
+                <button
+                  onClick={() => {
+                    setShowEditQuestionModal(false)
+                    setEditingQuestionId(null)
+                  }}
+                  className="flex-1 bg-gray-200 hover:bg-gray-300 text-gray-800 font-medium py-2 px-4 rounded-lg transition-colors"
+                >
+                  Cancelar
+                </button>
+                <button
+                  onClick={handleSaveEditedQuestion}
+                  className="flex-1 bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-4 rounded-lg transition-colors"
+                >
+                  Guardar Cambios
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {showAnswersModal && selectedQuestionId && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[70] p-4">
+        <div className="fixed inset-0 bg-[rgba(0,0,0,0.50)]  flex items-center justify-center z-[70] p-4">
           <div className="bg-white rounded-lg shadow-lg max-w-2xl w-full">
             <style>{`
               .answer-item {
