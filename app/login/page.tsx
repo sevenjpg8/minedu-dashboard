@@ -30,7 +30,7 @@ export default function LoginPage() {
           <div className="flex items-center gap-2">
             <div className="w-15 h-15 rounded flex items-center justify-center">
               <img
-                src="https://minedu.anccas.org/images/logo.png"
+                src="/logo-minedu.png"
                 alt="Logo Ministerio de Educación"
                 className="w-20 h-20 object-contain"
               />

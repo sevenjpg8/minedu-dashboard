@@ -143,6 +143,31 @@ export default function ReportesPage() {
         ? ["1", "2", "3", "4", "5"]
         : [] // 🔒 si es inicial u otro, no hay grados disponibles
 
+
+  const [charts, setCharts] = useState<any[]>([]);
+
+  useEffect(() => {
+    const fetchCharts = async () => {
+      if (!filters.encuesta) return;
+
+      const params = new URLSearchParams(
+        Object.entries(filters).filter(([_, v]) => v !== "")
+      );
+
+      console.log("🧩 Enviando filtros:", Object.fromEntries(params));
+
+      const res = await fetch(`/api/reportes?${params.toString()}`);
+      const data = await res.json();
+
+      console.log("📈 Datos recibidos:", data);
+
+      if (data.success) setCharts(data.charts);
+    };
+
+    fetchCharts();
+  }, [filters]);
+
+
   return (
     <div>
       <h1 className="text-2xl font-bold text-gray-800 mb-6">Reporte de Opciones Múltiples</h1>
@@ -269,17 +294,23 @@ export default function ReportesPage() {
 
       {/* Gráficos */}
       {showCharts ? (
-        <div className="grid grid-cols-2 gap-6">
-          <ChartCard title="En mi colegio los y las estudiantes nos llevamos bien" data={generateChartData(filters.encuesta)} />
-          <ChartCard title="Mis compañeros(as) se interesan por mí" data={generateChartData(filters.encuesta)} />
-          <ChartCard title="Mis compañeros(as) me ayudan cuando lo necesito" data={generateChartData(filters.encuesta)} />
-          <ChartCard title="Ayudo a mis compañeros(as) cuando lo necesitan" data={generateChartData(filters.encuesta)} />
-        </div>
+        charts.length > 0 ? (
+          <div className="grid grid-cols-2 gap-6">
+            {charts.map((chart, i) => (
+              <ChartCard key={i} title={chart.question} data={chart.data} />
+            ))}
+          </div>
+        ) : (
+          <div className="bg-white rounded-lg shadow-sm p-12 text-center">
+            <p className="text-gray-600">No hay datos disponibles para los filtros seleccionados.</p>
+          </div>
+        )
       ) : (
         <div className="bg-white rounded-lg shadow-sm p-12 text-center">
           <p className="text-gray-600">Por favor, seleccione una encuesta para ver los resultados.</p>
         </div>
       )}
+
     </div>
   )
 }

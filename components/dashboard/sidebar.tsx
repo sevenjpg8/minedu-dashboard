@@ -4,7 +4,7 @@ export default function Sidebar() {
       <div className="w-16 h-16 flex items-center justify-center mb-8">
         <div className="text-center">
           <img
-            src="https://minedu.anccas.org/images/logo.png"
+            src="/logo-minedu.png"
             alt="Logo Ministerio de Educación"
             className="w-10 h-10 object-contain"
           />
