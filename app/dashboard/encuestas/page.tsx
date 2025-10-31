@@ -1,3 +1,4 @@
+//dashboard/encuestas/page.tsx
 "use client"
 
 import { useEffect, useState } from "react"
@@ -51,7 +52,7 @@ export default function EncuestasPage() {
     }))
   }
 
-  const handleEdit = (survey: Survey) => {
+  const handleEdit = async (survey: Survey) => {
     setEditingId(survey.id)
     setFormData({
       title: survey.title,
@@ -60,9 +61,24 @@ export default function EncuestasPage() {
       ends_at: survey.ends_at,
       is_active: survey.is_active,
     })
-    setQuestions(survey.questions || [])
+
+    // 🔹 Obtener preguntas reales de esta encuesta
+    const { data: preguntas, error } = await supabase
+      .from("questions")
+      .select("id, text")
+      .eq("survey_id", survey.id)
+      .order("id", { ascending: true })
+
+    if (!error && preguntas) {
+      setQuestions(preguntas)
+    } else {
+      console.error("Error cargando preguntas:", error)
+      setQuestions([])
+    }
+
     setShowModal(true)
   }
+
 
   const handleAddQuestion = () => {
     if (newQuestion.trim()) {
@@ -79,43 +95,77 @@ export default function EncuestasPage() {
     setQuestions(questions.filter((q) => q.id !== id))
   }
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
+
     if (editingId) {
-      setSurveys(
-        surveys.map((survey) =>
-          survey.id === editingId
-            ? {
-                ...survey,
-                title: formData.title,
-                description: formData.description,
-                starts_at: formData.starts_at,
-                ends_at: formData.ends_at,
-                is_active: formData.is_active,
-                questions,
-              }
-            : survey,
-        ),
-      )
-    } else {
-      const newSurvey: Survey = {
-        id: surveys.length + 1,
-        title: formData.title,
-        description: formData.description,
-        unique_link_slug: "",
-        starts_at: formData.starts_at,
-        ends_at: formData.ends_at,
-        is_active: formData.is_active,
-        questions,
+      // 🔹 Actualizar encuesta existente
+      const { error: updateError } = await supabase
+        .from("surveys")
+        .update({
+          title: formData.title,
+          description: formData.description,
+          starts_at: formData.starts_at,
+          ends_at: formData.ends_at,
+          is_active: formData.is_active,
+        })
+        .eq("id", editingId)
+
+      if (updateError) {
+        console.error("Error actualizando encuesta:", updateError)
+        return
       }
-      setSurveys([...surveys, newSurvey])
+
+      // 🔹 Actualizar preguntas (borrar y volver a insertar)
+      await supabase.from("questions").delete().eq("survey_id", editingId)
+      if (questions.length > 0) {
+        const nuevasPreguntas = questions.map((q) => ({
+          survey_id: editingId,
+          text: q.text,
+          type: "multiple_choice", // tipo genérico por defecto
+          order: q.id,
+        }))
+        await supabase.from("questions").insert(nuevasPreguntas)
+      }
+    } else {
+      // 🔹 Crear encuesta nueva
+      const { data: nuevaEncuesta, error: insertError } = await supabase
+        .from("surveys")
+        .insert([
+          {
+            title: formData.title,
+            description: formData.description,
+            starts_at: formData.starts_at,
+            ends_at: formData.ends_at,
+            is_active: formData.is_active,
+            unique_link_slug: crypto.randomUUID(),
+          },
+        ])
+        .select("id")
+        .single()
+
+      if (insertError) {
+        console.error("Error insertando encuesta:", insertError)
+        return
+      }
+
+      if (nuevaEncuesta && questions.length > 0) {
+        const preguntasConId = questions.map((q) => ({
+          survey_id: nuevaEncuesta.id,
+          text: q.text,
+          type: "multiple_choice",
+          order: q.id,
+        }))
+        await supabase.from("questions").insert(preguntasConId)
+      }
     }
 
-    setFormData({ title: "", description: "", starts_at: "", ends_at: "", is_active: false })
-    setQuestions([])
-    setEditingId(null)
-    setShowModal(false)
+    // Refrescar lista
+    const refreshed = await getSurveys()
+    setSurveys(refreshed)
+    handleCloseModal()
   }
+
 
   const handleDelete = (id: number) => {
     setSurveys(surveys.filter((survey) => survey.id !== id))
