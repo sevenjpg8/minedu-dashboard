@@ -3,16 +3,19 @@ import { supabase } from "@/lib/supabaseClient"
 
 interface AnswerRow {
   id: number
-  question: { text: string }[] | { text: string } | null
-  option: { text: string }[] | { text: string } | null
+  question: { text: string } | null
+  option: { text: string } | null
   survey_participation: {
     survey_id: number
     school_id: number
     education_level: string
     grade: string
     school?: {
-      ugel_id: number
-      ugel?: { dre_id: number }
+      id: number
+      ugel?: {
+        id: number
+        dre?: { id: number }
+      }
     }
   }
 }
@@ -31,7 +34,7 @@ export async function GET(req: Request) {
       return NextResponse.json({ success: false, message: "Falta encuesta" }, { status: 400 })
     }
 
-    // 1️⃣ Obtener colegios válidos
+    // 1️⃣ Obtener colegios válidos desde encuesta_relacionada
     const { data: colegiosValidos, error: colegiosError } = await supabase
       .from("encuesta_relacionada")
       .select("school_id")
@@ -43,7 +46,7 @@ export async function GET(req: Request) {
 
     const colegiosIds = colegiosValidos.map((c) => Number(c.school_id))
 
-    // 2️⃣ Query principal
+    // 2️⃣ Query principal — ahora con relaciones reales
     let query = supabase
       .from("answers")
       .select(`
@@ -54,15 +57,22 @@ export async function GET(req: Request) {
           survey_id,
           school_id,
           education_level,
-          grade
+          grade,
+          school:school_id(
+            id,
+            ugel:ugels!schools_ugel_id_fkey(
+              id,
+              dre:dre_id(id)
+            )
+          )
         )
       `)
       .eq("survey_participation.survey_id", surveyId)
       .in("survey_participation.school_id", colegiosIds)
 
-
-    if (dreId) query = query.eq("survey_participation.school.ugel.dre_id", dreId)
-    if (ugelId) query = query.eq("survey_participation.school.ugel_id", ugelId)
+    // 3️⃣ Filtros jerárquicos
+    if (dreId) query = query.eq("survey_participation.school.ugel.dre.id", dreId)
+    if (ugelId) query = query.eq("survey_participation.school.ugel.id", ugelId)
     if (schoolId) query = query.eq("survey_participation.school_id", schoolId)
     if (nivelEducativo) query = query.eq("survey_participation.education_level", nivelEducativo)
     if (grado) query = query.eq("survey_participation.grade", grado)
@@ -73,19 +83,12 @@ export async function GET(req: Request) {
     if (!data || data.length === 0)
       return NextResponse.json({ success: true, charts: [] })
 
-    // 3️⃣ Agrupar resultados
+    // 4️⃣ Agrupar resultados
     const agrupado: Record<string, Record<string, number>> = {}
 
     for (const row of data) {
-      const pregunta =
-        Array.isArray(row.question)
-          ? row.question[0]?.text || "Sin pregunta"
-          : row.question?.text || "Sin pregunta"
-
-      const opcion =
-        Array.isArray(row.option)
-          ? row.option[0]?.text || "Sin opción"
-          : row.option?.text || "Sin opción"
+      const pregunta = row.question?.text || "Sin pregunta"
+      const opcion = row.option?.text || "Sin opción"
 
       if (!agrupado[pregunta]) agrupado[pregunta] = {}
       if (!agrupado[pregunta][opcion]) agrupado[pregunta][opcion] = 0
@@ -93,7 +96,7 @@ export async function GET(req: Request) {
       agrupado[pregunta][opcion]++
     }
 
-    // 4️⃣ Formato final
+    // 5️⃣ Formato final para los gráficos
     const charts = Object.entries(agrupado).map(([pregunta, opciones]) => ({
       question: pregunta,
       data: Object.entries(opciones).map(([name, count]) => ({
