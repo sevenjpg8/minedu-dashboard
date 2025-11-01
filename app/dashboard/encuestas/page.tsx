@@ -39,7 +39,7 @@ export default function EncuestasPage() {
     isOpen: false,
     title: "",
     description: "",
-    onConfirm: () => {},
+    onConfirm: () => { },
   })
   const [alertDialog, setAlertDialog] = useState({
     isOpen: false,
@@ -201,11 +201,11 @@ export default function EncuestasPage() {
       const updatedQuestions = questions.map((q) =>
         q.id === editingQuestionId
           ? {
-              ...q,
-              text: editingQuestionText,
-              prefix: editingQuestionPrefix.trim() || null,
-              description: editingQuestionDescription,
-            }
+            ...q,
+            text: editingQuestionText,
+            prefix: editingQuestionPrefix.trim() || null,
+            description: editingQuestionDescription,
+          }
           : q,
       )
       setQuestions(updatedQuestions)
@@ -346,40 +346,47 @@ export default function EncuestasPage() {
       const result = await response.json()
 
       if (result.success) {
-        setAlertDialog({
-          isOpen: true,
-          title: "¡Éxito!",
-          message: editingId ? "✅ Encuesta actualizada correctamente" : "✅ Encuesta creada correctamente",
-          type: "success",
-        })
-        setShowModal(false)
-        setEditingId(null)
-        setFormData({ title: "", description: "", startDate: "", endDate: "", active: false })
-        setQuestions([])
+        setTimeout(() => {
+          setAlertDialog({
+            isOpen: true,
+            title: "¡Éxito!",
+            message: editingId
+              ? "✅ Encuesta actualizada correctamente"
+              : "✅ Encuesta creada correctamente",
+            type: "success",
+          })
+          setShowModal(false)
+          setEditingId(null)
+          setFormData({
+            title: "",
+            description: "",
+            startDate: "",
+            endDate: "",
+            active: false,
+          })
+          setQuestions([])
 
-        fetch("/api/surveys")
-          .then((response) => response.json())
-          .then((data) => {
-            if (Array.isArray(data)) {
-              setSurveys(
-                data.map((s: any) => ({
-                  id: s.id,
-                  title: s.title,
-                  description: s.description ?? "",
-                  status: s.is_active ? "Activa" : "Inactiva",
-                  startDate: s.starts_at?.split("T")[0] ?? "",
-                  endDate: s.ends_at?.split("T")[0] ?? "",
-                })),
-              )
-            }
-          })
-          .catch((err) => {
-            console.error("Error cargando encuestas:", err)
-          })
-          .finally(() => {
-            setIsSubmitting(false)
-          })
-      } else {
+          fetch("/api/surveys")
+            .then((response) => response.json())
+            .then((data) => {
+              if (Array.isArray(data)) {
+                setSurveys(
+                  data.map((s: any) => ({
+                    id: s.id,
+                    title: s.title,
+                    description: s.description ?? "",
+                    status: s.is_active ? "Activa" : "Inactiva",
+                    startDate: s.starts_at?.split("T")[0] ?? "",
+                    endDate: s.ends_at?.split("T")[0] ?? "",
+                  }))
+                )
+              }
+            })
+            .catch((err) => console.error("Error cargando encuestas:", err))
+            .finally(() => setIsSubmitting(false))
+        }, 1400) // <-- aquí agregas el retardo
+      }
+      else {
         setAlertDialog({
           isOpen: true,
           title: "Error",
@@ -481,7 +488,7 @@ export default function EncuestasPage() {
 
       <LoadingDialog
         isOpen={isSubmitting}
-        message="Actualizando encuesta..."
+        message={editingId ? "Actualizando encuesta..." : "Creando encuesta..."}
         duration={1400}
         onClose={() => setIsSubmitting(false)}
       />
@@ -530,9 +537,8 @@ export default function EncuestasPage() {
                   </td>
                   <td className="px-6 py-4">
                     <span
-                      className={`inline-block ${
-                        survey.status === "Activa" ? "bg-green-100 text-green-800" : "bg-gray-200 text-gray-700"
-                      } text-xs font-semibold px-3 py-1 rounded-full`}
+                      className={`inline-block ${survey.status === "Activa" ? "bg-green-100 text-green-800" : "bg-gray-200 text-gray-700"
+                        } text-xs font-semibold px-3 py-1 rounded-full`}
                     >
                       {survey.status}
                     </span>
@@ -878,9 +884,8 @@ export default function EncuestasPage() {
                       onDragStart={() => handleDragStart(index)}
                       onDragOver={handleDragOver}
                       onDrop={() => handleDrop(index)}
-                      className={`question-item flex items-start justify-between bg-gradient-to-r from-blue-50 to-blue-25 p-4 rounded-lg border border-blue-200 cursor-move hover:shadow-md ${
-                        draggedIndex === index ? "dragging" : ""
-                      }`}
+                      className={`question-item flex items-start justify-between bg-gradient-to-r from-blue-50 to-blue-25 p-4 rounded-lg border border-blue-200 cursor-move hover:shadow-md ${draggedIndex === index ? "dragging" : ""
+                        }`}
                     >
                       <div className="flex items-start gap-3 flex-1">
                         <GripVertical
@@ -1073,9 +1078,8 @@ export default function EncuestasPage() {
                       onDragStart={() => handleDragStartAnswer(index)}
                       onDragOver={handleDragOver}
                       onDrop={() => handleDropAnswer(index)}
-                      className={`answer-item flex items-start justify-between bg-gradient-to-r from-green-50 to-green-25 p-4 rounded-lg border border-green-200 cursor-move hover:shadow-md ${
-                        draggedAnswerIndex === index ? "dragging" : ""
-                      }`}
+                      className={`answer-item flex items-start justify-between bg-gradient-to-r from-green-50 to-green-25 p-4 rounded-lg border border-green-200 cursor-move hover:shadow-md ${draggedAnswerIndex === index ? "dragging" : ""
+                        }`}
                     >
                       <div className="flex items-start gap-3 flex-1">
                         <GripVertical
