@@ -11,7 +11,6 @@ export async function GET() {
         survey_id,
         prefix,
         text,
-        description,
         options (
           id,
           text

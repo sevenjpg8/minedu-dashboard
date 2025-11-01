@@ -67,7 +67,6 @@ export async function PUT(req: Request) {
           .update({
             text: q.text,
             prefix: q.prefix ?? null,
-            description: q.description ?? null,
             updated_at: new Date().toISOString(),
           })
           .eq("id", q.id)
