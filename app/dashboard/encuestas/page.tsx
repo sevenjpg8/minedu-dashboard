@@ -4,6 +4,9 @@ import type React from "react"
 
 import { useState, useEffect, useMemo } from "react"
 import { Trash2, Edit2, X, Plus, GripVertical, Settings, ChevronLeft, ChevronRight } from "lucide-react"
+import { ConfirmDialog } from "@/components/dialogs/confirm-dialog"
+import { AlertDialog } from "@/components/dialogs/alert-dialog"
+import { LoadingDialog } from "@/components/dialogs/loading-dialog"
 
 interface Answer {
   id: number
@@ -32,6 +35,20 @@ export default function EncuestasPage() {
   const [surveys, setSurveys] = useState<Survey[]>([])
   const [loading, setLoading] = useState(true)
 
+  const [confirmDialog, setConfirmDialog] = useState({
+    isOpen: false,
+    title: "",
+    description: "",
+    onConfirm: () => {},
+  })
+  const [alertDialog, setAlertDialog] = useState({
+    isOpen: false,
+    title: "",
+    message: "",
+    type: "info" as "success" | "error" | "info",
+  })
+  const [isSubmitting, setIsSubmitting] = useState(false)
+
   useEffect(() => {
     const fetchSurveys = async () => {
       try {
@@ -46,7 +63,7 @@ export default function EncuestasPage() {
               status: s.is_active ? "Activa" : "Inactiva",
               startDate: s.starts_at?.split("T")[0] ?? "",
               endDate: s.ends_at?.split("T")[0] ?? "",
-            }))
+            })),
           )
         }
       } catch (err) {
@@ -61,14 +78,13 @@ export default function EncuestasPage() {
 
   // --- PAGINACIÓN (solo front) ---
   const [currentPage, setCurrentPage] = useState<number>(1)
-  const [pageSize, setPageSize] = useState<number>(5) // default: 5 por página
+  const [pageSize, setPageSize] = useState<number>(5)
 
   const totalPages = useMemo(() => {
     if (pageSize <= 0) return 1
     return Math.max(1, Math.ceil(surveys.length / pageSize))
   }, [surveys.length, pageSize])
 
-  // Ajusta currentPage si cambia surveys / pageSize
   useEffect(() => {
     if (currentPage > totalPages) setCurrentPage(totalPages)
     if (surveys.length === 0) setCurrentPage(1)
@@ -80,19 +96,15 @@ export default function EncuestasPage() {
     return surveys.slice(start, start + pageSize)
   }, [surveys, currentPage, pageSize])
 
-  // Funciones de paginación
   const gotoPage = (page: number) => {
     const p = Math.min(Math.max(1, page), totalPages)
     setCurrentPage(p)
   }
 
   const handlePageSizeChange = (value: number) => {
-    // Si selecciona 0 -> mostrar todos
     setPageSize(value)
     setCurrentPage(1)
   }
-
-  // ----------------------------------
 
   const [showModal, setShowModal] = useState(false)
   const [showQuestionsModal, setShowQuestionsModal] = useState(false)
@@ -128,46 +140,49 @@ export default function EncuestasPage() {
     }))
   }
 
-const handleEdit = async (survey: Survey) => {
-  try {
-    setEditingId(survey.id)
-    setFormData({
-      title: survey.title,
-      description: survey.description,
-      startDate: survey.startDate,
-      endDate: survey.endDate,
-      active: survey.status === "Activa",
-    })
+  const handleEdit = async (survey: Survey) => {
+    try {
+      setEditingId(survey.id)
+      setFormData({
+        title: survey.title,
+        description: survey.description,
+        startDate: survey.startDate,
+        endDate: survey.endDate,
+        active: survey.status === "Activa",
+      })
 
-    // 🔹 Llamar al endpoint que devuelve preguntas y respuestas de esa encuesta
-    const res = await fetch(`/api/surveys/${survey.id}`)
-const data = await res.json()
+      const res = await fetch(`/api/surveys/${survey.id}`)
+      const data = await res.json()
 
-if (data && Array.isArray(data.questions)) {
-  setQuestions(
-    data.questions.map((q: any) => ({
-      id: q.id,
-      text: q.text,
-      prefix: q.prefix,
-      description: q.description,
-      answers: q.options?.map((a: any) => ({
-        id: a.id,
-        text: a.text,
-      })) ?? [],
-    }))
-  )
-} else {
-  setQuestions([])
-}
+      if (data && Array.isArray(data.questions)) {
+        setQuestions(
+          data.questions.map((q: any) => ({
+            id: q.id,
+            text: q.text,
+            prefix: q.prefix,
+            description: q.description,
+            answers:
+              q.options?.map((a: any) => ({
+                id: a.id,
+                text: a.text,
+              })) ?? [],
+          })),
+        )
+      } else {
+        setQuestions([])
+      }
 
-
-    setShowModal(true)
-  } catch (err) {
-    console.error("Error al cargar la encuesta completa:", err)
-    alert("No se pudieron cargar las preguntas de la encuesta.")
+      setShowModal(true)
+    } catch (err) {
+      console.error("Error al cargar la encuesta completa:", err)
+      setAlertDialog({
+        isOpen: true,
+        title: "Error",
+        message: "No se pudieron cargar las preguntas de la encuesta.",
+        type: "error",
+      })
+    }
   }
-}
-
 
   const handleOpenQuestionsModal = () => {
     setShowQuestionsModal(true)
@@ -191,7 +206,7 @@ if (data && Array.isArray(data.questions)) {
               prefix: editingQuestionPrefix.trim() || null,
               description: editingQuestionDescription,
             }
-          : q
+          : q,
       )
       setQuestions(updatedQuestions)
       setShowEditQuestionModal(false)
@@ -295,108 +310,143 @@ if (data && Array.isArray(data.questions)) {
     setDraggedAnswerIndex(null)
   }
 
-const handleSubmit = async (e: React.FormEvent) => {
-  e.preventDefault()
-
-  try {
-    const payload = {
-      id: editingId, // 👈 Agregar ID para actualización
-      title: formData.title,
-      description: formData.description,
-      startDate: formData.startDate,
-      endDate: formData.endDate,
-      active: formData.active,
-      questions: questions.map((q) => ({
-        id: q.id, // 👈 mantener ID si existe
-        prefix: q.prefix ?? null,
-        text: q.text,
-        description: q.description,
-        answers:
-          q.answers?.map((a) => ({
-            id: a.id,
-            text: a.text,
-          })) ?? [],
-      })),
-    }
-
-    console.log("Enviando encuesta:", payload)
-
-    const response = await fetch(editingId ? "/api/surveys/surveysupdate" : "/api/surveys/surveyscreate", {
-      method: editingId ? "PUT" : "POST", // 👈 usar PUT si edita
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload),
-    })
-
-    const result = await response.json()
-
-    if (result.success) {
-      alert(editingId ? "✅ Encuesta actualizada correctamente" : "✅ Encuesta creada correctamente")
-      setShowModal(false)
-      setEditingId(null)
-      setFormData({ title: "", description: "", startDate: "", endDate: "", active: false })
-      setQuestions([])
-
-      // refrescar lista
-      const refreshed = await fetch("/api/surveys")
-      const data = await refreshed.json()
-      setSurveys(
-        data.map((s: any) => ({
-          id: s.id,
-          title: s.title,
-          description: s.description ?? "",
-          status: s.is_active ? "Activa" : "Inactiva",
-          startDate: s.starts_at?.split("T")[0] ?? "",
-          endDate: s.ends_at?.split("T")[0] ?? "",
-        }))
-      )
-    } else {
-      alert("❌ Error al guardar la encuesta: " + result.error)
-    }
-  } catch (err) {
-    console.error(err)
-    alert("❌ Error inesperado al guardar")
-  }
-}
-
-
-  const handleDelete = async (id: number) => {
-    // Confirmación rápida en el cliente
-    const ok = confirm("¿Estás seguro que quieres eliminar esta encuesta? Esta acción no se puede deshacer.")
-    if (!ok) return
-
-    // Optimistic update: guardar estado previo para rollback si falla
-    const previous = surveys
-    const newList = surveys.filter((survey) => survey.id !== id)
-    setSurveys(newList)
-
-    // ajustar página si era la última y quedó vacía
-    const newTotalPages = pageSize > 0 ? Math.max(1, Math.ceil(newList.length / pageSize)) : 1
-    if (currentPage > newTotalPages) setCurrentPage(newTotalPages)
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setIsSubmitting(true)
 
     try {
-      const res = await fetch("/api/surveys/surveysdelete", {
-        method: "DELETE",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ id }),
-      })
-
-      const result = await res.json()
-
-      if (!res.ok || !result.success) {
-        throw new Error(result?.error || "Error al eliminar encuesta")
+      const payload = {
+        id: editingId,
+        title: formData.title,
+        description: formData.description,
+        startDate: formData.startDate,
+        endDate: formData.endDate,
+        active: formData.active,
+        questions: questions.map((q) => ({
+          id: q.id,
+          prefix: q.prefix ?? null,
+          text: q.text,
+          description: q.description,
+          answers:
+            q.answers?.map((a) => ({
+              id: a.id,
+              text: a.text,
+            })) ?? [],
+        })),
       }
 
-      // opcional: mostrar notificación de éxito
-      // alert('Encuesta eliminada correctamente')
+      console.log("Enviando encuesta:", payload)
+
+      const response = await fetch(editingId ? "/api/surveys/surveysupdate" : "/api/surveys/surveyscreate", {
+        method: editingId ? "PUT" : "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      })
+
+      const result = await response.json()
+
+      if (result.success) {
+        setAlertDialog({
+          isOpen: true,
+          title: "¡Éxito!",
+          message: editingId ? "✅ Encuesta actualizada correctamente" : "✅ Encuesta creada correctamente",
+          type: "success",
+        })
+        setShowModal(false)
+        setEditingId(null)
+        setFormData({ title: "", description: "", startDate: "", endDate: "", active: false })
+        setQuestions([])
+
+        fetch("/api/surveys")
+          .then((response) => response.json())
+          .then((data) => {
+            if (Array.isArray(data)) {
+              setSurveys(
+                data.map((s: any) => ({
+                  id: s.id,
+                  title: s.title,
+                  description: s.description ?? "",
+                  status: s.is_active ? "Activa" : "Inactiva",
+                  startDate: s.starts_at?.split("T")[0] ?? "",
+                  endDate: s.ends_at?.split("T")[0] ?? "",
+                })),
+              )
+            }
+          })
+          .catch((err) => {
+            console.error("Error cargando encuestas:", err)
+          })
+          .finally(() => {
+            setIsSubmitting(false)
+          })
+      } else {
+        setAlertDialog({
+          isOpen: true,
+          title: "Error",
+          message: "❌ Error al guardar la encuesta: " + result.error,
+          type: "error",
+        })
+        setIsSubmitting(false)
+      }
     } catch (err) {
-      console.error("Error eliminando encuesta:", err)
-      // Revertir cambio local
-      setSurveys(previous)
-      // ajustar página nuevamente
-      const restoredTotalPages = pageSize > 0 ? Math.max(1, Math.ceil(previous.length / pageSize)) : 1
-      if (currentPage > restoredTotalPages) setCurrentPage(restoredTotalPages)
-      alert("No se pudo eliminar la encuesta. Por favor, inténtalo de nuevo.")
+      console.error(err)
+      setAlertDialog({
+        isOpen: true,
+        title: "Error",
+        message: "❌ Error inesperado al guardar",
+        type: "error",
+      })
+      setIsSubmitting(false)
     }
+  }
+
+  const handleDelete = async (id: number) => {
+    setConfirmDialog({
+      isOpen: true,
+      title: "Eliminar Encuesta",
+      description: "¿Estás seguro que quieres eliminar esta encuesta? Esta acción no se puede deshacer.",
+      onConfirm: async () => {
+        const previous = surveys
+        const newList = surveys.filter((survey) => survey.id !== id)
+        setSurveys(newList)
+
+        const newTotalPages = pageSize > 0 ? Math.max(1, Math.ceil(newList.length / pageSize)) : 1
+        if (currentPage > newTotalPages) setCurrentPage(newTotalPages)
+
+        try {
+          const res = await fetch("/api/surveys/surveysdelete", {
+            method: "DELETE",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ id }),
+          })
+
+          const result = await res.json()
+
+          if (!res.ok || !result.success) {
+            throw new Error(result?.error || "Error al eliminar encuesta")
+          }
+
+          setAlertDialog({
+            isOpen: true,
+            title: "¡Éxito!",
+            message: "Encuesta eliminada correctamente",
+            type: "success",
+          })
+        } catch (err) {
+          console.error("Error eliminando encuesta:", err)
+          setSurveys(previous)
+          const restoredTotalPages = pageSize > 0 ? Math.max(1, Math.ceil(previous.length / pageSize)) : 1
+          if (currentPage > restoredTotalPages) setCurrentPage(restoredTotalPages)
+          setAlertDialog({
+            isOpen: true,
+            title: "Error",
+            message: "No se pudo eliminar la encuesta. Por favor, inténtalo de nuevo.",
+            type: "error",
+          })
+        }
+        setConfirmDialog({ ...confirmDialog, isOpen: false })
+      },
+    })
   }
 
   const handleCloseModal = () => {
@@ -410,6 +460,32 @@ const handleSubmit = async (e: React.FormEvent) => {
 
   return (
     <div>
+      <ConfirmDialog
+        isOpen={confirmDialog.isOpen}
+        title={confirmDialog.title}
+        description={confirmDialog.description}
+        confirmText="Eliminar"
+        cancelText="Cancelar"
+        isDestructive={true}
+        onConfirm={confirmDialog.onConfirm}
+        onCancel={() => setConfirmDialog({ ...confirmDialog, isOpen: false })}
+      />
+
+      <AlertDialog
+        isOpen={alertDialog.isOpen}
+        title={alertDialog.title}
+        message={alertDialog.message}
+        type={alertDialog.type}
+        onClose={() => setAlertDialog({ ...alertDialog, isOpen: false })}
+      />
+
+      <LoadingDialog
+        isOpen={isSubmitting}
+        message="Actualizando encuesta..."
+        duration={1400}
+        onClose={() => setIsSubmitting(false)}
+      />
+
       <div className="flex items-center justify-between mb-6">
         <h1 className="text-2xl font-bold text-gray-800">Lista de Encuestas</h1>
         <button
@@ -454,10 +530,9 @@ const handleSubmit = async (e: React.FormEvent) => {
                   </td>
                   <td className="px-6 py-4">
                     <span
-                      className={`inline-block ${survey.status === "Activa"
-                        ? "bg-green-100 text-green-800"
-                        : "bg-gray-200 text-gray-700"
-                        } text-xs font-semibold px-3 py-1 rounded-full`}
+                      className={`inline-block ${
+                        survey.status === "Activa" ? "bg-green-100 text-green-800" : "bg-gray-200 text-gray-700"
+                      } text-xs font-semibold px-3 py-1 rounded-full`}
                     >
                       {survey.status}
                     </span>
@@ -495,7 +570,6 @@ const handleSubmit = async (e: React.FormEvent) => {
       {surveys.length > 0 && (
         <div className="flex items-center justify-between gap-4 mt-4">
           <div className="text-sm text-gray-600">
-            {/* calculo índices mostrados */}
             {(() => {
               const total = surveys.length
               const start = pageSize > 0 ? (currentPage - 1) * pageSize + 1 : 1
@@ -535,15 +609,12 @@ const handleSubmit = async (e: React.FormEvent) => {
               <ChevronLeft size={14} /> Anterior
             </button>
 
-            {/* Números de página (limitado a un rango razonable) */}
             <div className="flex items-center gap-1 px-2">
               {(() => {
                 const pages: number[] = []
-                // mostrar hasta 7 botones: current ±3
                 const range = 3
                 let start = Math.max(1, currentPage - range)
                 let end = Math.min(totalPages, currentPage + range)
-                // ajustar si estamos cerca del inicio o final para mostrar siempre hasta 7 si es posible
                 if (currentPage <= range) {
                   end = Math.min(totalPages, 1 + range * 2)
                 }
@@ -807,8 +878,9 @@ const handleSubmit = async (e: React.FormEvent) => {
                       onDragStart={() => handleDragStart(index)}
                       onDragOver={handleDragOver}
                       onDrop={() => handleDrop(index)}
-                      className={`question-item flex items-start justify-between bg-gradient-to-r from-blue-50 to-blue-25 p-4 rounded-lg border border-blue-200 cursor-move hover:shadow-md ${draggedIndex === index ? "dragging" : ""
-                        }`}
+                      className={`question-item flex items-start justify-between bg-gradient-to-r from-blue-50 to-blue-25 p-4 rounded-lg border border-blue-200 cursor-move hover:shadow-md ${
+                        draggedIndex === index ? "dragging" : ""
+                      }`}
                     >
                       <div className="flex items-start gap-3 flex-1">
                         <GripVertical
@@ -1001,8 +1073,9 @@ const handleSubmit = async (e: React.FormEvent) => {
                       onDragStart={() => handleDragStartAnswer(index)}
                       onDragOver={handleDragOver}
                       onDrop={() => handleDropAnswer(index)}
-                      className={`answer-item flex items-start justify-between bg-gradient-to-r from-green-50 to-green-25 p-4 rounded-lg border border-green-200 cursor-move hover:shadow-md ${draggedAnswerIndex === index ? "dragging" : ""
-                        }`}
+                      className={`answer-item flex items-start justify-between bg-gradient-to-r from-green-50 to-green-25 p-4 rounded-lg border border-green-200 cursor-move hover:shadow-md ${
+                        draggedAnswerIndex === index ? "dragging" : ""
+                      }`}
                     >
                       <div className="flex items-start gap-3 flex-1">
                         <GripVertical
