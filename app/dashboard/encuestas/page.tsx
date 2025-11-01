@@ -2,8 +2,8 @@
 
 import type React from "react"
 
-import { useState } from "react"
-import { Trash2, Edit2, X, Plus, GripVertical, Settings } from "lucide-react"
+import { useState, useEffect, useMemo } from "react"
+import { Trash2, Edit2, X, Plus, GripVertical, Settings, ChevronLeft, ChevronRight } from "lucide-react"
 
 interface Answer {
   id: number
@@ -29,35 +29,70 @@ interface Survey {
 }
 
 export default function EncuestasPage() {
-  const [surveys, setSurveys] = useState<Survey[]>([
-    {
-      id: 1,
-      title: "dsasdsad",
-      description: "sadasd",
-      status: "Activa",
-      startDate: "11/10/2025",
-      endDate: "14/10/2025",
-      questions: [],
-    },
-    {
-      id: 2,
-      title: "Encuesta de Convivencia Escolar 2025 - Primaria",
-      description: "Queremos saber cómo te sientes en tu colegio. ¡Tus...",
-      status: "Activa",
-      startDate: "09/10/2025",
-      endDate: "09/11/2025",
-      questions: [],
-    },
-    {
-      id: 3,
-      title: "Encuesta de Convivencia Escolar 2025 - Secundaria",
-      description: "Tu opinión es fundamental para mejorar la conviven...",
-      status: "Activa",
-      startDate: "09/10/2025",
-      endDate: "09/11/2025",
-      questions: [],
-    },
-  ])
+  const [surveys, setSurveys] = useState<Survey[]>([])
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    const fetchSurveys = async () => {
+      try {
+        const response = await fetch("/api/surveys")
+        const data = await response.json()
+        if (Array.isArray(data)) {
+          setSurveys(
+            data.map((s: any) => ({
+              id: s.id,
+              title: s.title,
+              description: s.description ?? "",
+              status: s.is_active ? "Activa" : "Inactiva",
+              startDate: s.starts_at?.split("T")[0] ?? "",
+              endDate: s.ends_at?.split("T")[0] ?? "",
+            }))
+          )
+        }
+      } catch (err) {
+        console.error("Error cargando encuestas:", err)
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    fetchSurveys()
+  }, [])
+
+  // --- PAGINACIÓN (solo front) ---
+  const [currentPage, setCurrentPage] = useState<number>(1)
+  const [pageSize, setPageSize] = useState<number>(5) // default: 5 por página
+
+  const totalPages = useMemo(() => {
+    if (pageSize <= 0) return 1
+    return Math.max(1, Math.ceil(surveys.length / pageSize))
+  }, [surveys.length, pageSize])
+
+  // Ajusta currentPage si cambia surveys / pageSize
+  useEffect(() => {
+    if (currentPage > totalPages) setCurrentPage(totalPages)
+    if (surveys.length === 0) setCurrentPage(1)
+  }, [surveys.length, totalPages, currentPage])
+
+  const displayedSurveys = useMemo(() => {
+    if (pageSize <= 0) return surveys
+    const start = (currentPage - 1) * pageSize
+    return surveys.slice(start, start + pageSize)
+  }, [surveys, currentPage, pageSize])
+
+  // Funciones de paginación
+  const gotoPage = (page: number) => {
+    const p = Math.min(Math.max(1, page), totalPages)
+    setCurrentPage(p)
+  }
+
+  const handlePageSizeChange = (value: number) => {
+    // Si selecciona 0 -> mostrar todos
+    setPageSize(value)
+    setCurrentPage(1)
+  }
+
+  // ----------------------------------
 
   const [showModal, setShowModal] = useState(false)
   const [showQuestionsModal, setShowQuestionsModal] = useState(false)
@@ -128,7 +163,7 @@ export default function EncuestasPage() {
               prefix: editingQuestionPrefix.trim() || null,
               description: editingQuestionDescription,
             }
-          : q,
+          : q
       )
       setQuestions(updatedQuestions)
       setShowEditQuestionModal(false)
@@ -267,6 +302,7 @@ export default function EncuestasPage() {
         setShowModal(false)
         setFormData({ title: "", description: "", startDate: "", endDate: "", active: false })
         setQuestions([])
+        // refrescar lista (si prefieres que venga del backend, haz otro fetch aquí)
       } else {
         alert("❌ Error al guardar la encuesta: " + result.error)
       }
@@ -277,7 +313,13 @@ export default function EncuestasPage() {
   }
 
   const handleDelete = (id: number) => {
-    setSurveys(surveys.filter((survey) => survey.id !== id))
+    // Sólo front: eliminar de la lista local
+    const newList = surveys.filter((survey) => survey.id !== id)
+    setSurveys(newList)
+
+    // ajustar página si era la última y quedó vacía
+    const newTotalPages = pageSize > 0 ? Math.max(1, Math.ceil(newList.length / pageSize)) : 1
+    if (currentPage > newTotalPages) setCurrentPage(newTotalPages)
   }
 
   const handleCloseModal = () => {
@@ -312,46 +354,156 @@ export default function EncuestasPage() {
             </tr>
           </thead>
           <tbody>
-            {surveys.map((survey) => (
-              <tr key={survey.id} className="border-b border-gray-200 hover:bg-gray-50">
-                <td className="px-6 py-4">
-                  <div>
-                    <p className="text-gray-900 font-medium">{survey.title}</p>
-                    <p className="text-gray-600 text-sm">{survey.description}</p>
-                  </div>
-                </td>
-                <td className="px-6 py-4">
-                  <span className="inline-block bg-green-100 text-green-800 text-xs font-semibold px-3 py-1 rounded-full">
-                    {survey.status}
-                  </span>
-                </td>
-                <td className="px-6 py-4 text-gray-600 text-sm">
-                  <p>Inicio: {survey.startDate}</p>
-                  <p>Fin: {survey.endDate}</p>
-                </td>
-                <td className="px-6 py-4">
-                  <div className="flex gap-3">
-                    <button
-                      onClick={() => handleEdit(survey)}
-                      className="text-blue-600 hover:text-blue-800 font-medium text-sm flex items-center gap-1"
-                    >
-                      <Edit2 size={16} />
-                      Editar
-                    </button>
-                    <button
-                      onClick={() => handleDelete(survey.id)}
-                      className="text-red-600 hover:text-red-800 font-medium text-sm flex items-center gap-1"
-                    >
-                      <Trash2 size={16} />
-                      Eliminar
-                    </button>
-                  </div>
+            {loading ? (
+              <tr>
+                <td colSpan={4} className="text-center py-6 text-gray-500">
+                  Cargando encuestas...
                 </td>
               </tr>
-            ))}
+            ) : surveys.length === 0 ? (
+              <tr>
+                <td colSpan={4} className="text-center py-6 text-gray-500">
+                  No hay encuestas registradas aún
+                </td>
+              </tr>
+            ) : (
+              displayedSurveys.map((survey) => (
+                <tr key={survey.id} className="border-b border-gray-200 hover:bg-gray-50">
+                  <td className="px-6 py-4">
+                    <div>
+                      <p className="text-gray-900 font-medium">{survey.title}</p>
+                      <p className="text-gray-600 text-sm">{survey.description}</p>
+                    </div>
+                  </td>
+                  <td className="px-6 py-4">
+                    <span
+                      className={`inline-block ${survey.status === "Activa"
+                        ? "bg-green-100 text-green-800"
+                        : "bg-gray-200 text-gray-700"
+                        } text-xs font-semibold px-3 py-1 rounded-full`}
+                    >
+                      {survey.status}
+                    </span>
+                  </td>
+                  <td className="px-6 py-4 text-gray-600 text-sm">
+                    <p>Inicio: {survey.startDate || "-"}</p>
+                    <p>Fin: {survey.endDate || "-"}</p>
+                  </td>
+                  <td className="px-6 py-4">
+                    <div className="flex gap-3">
+                      <button
+                        onClick={() => handleEdit(survey)}
+                        className="text-blue-600 hover:text-blue-800 font-medium text-sm flex items-center gap-1"
+                      >
+                        <Edit2 size={16} />
+                        Editar
+                      </button>
+                      <button
+                        onClick={() => handleDelete(survey.id)}
+                        className="text-red-600 hover:text-red-800 font-medium text-sm flex items-center gap-1"
+                      >
+                        <Trash2 size={16} />
+                        Eliminar
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              ))
+            )}
           </tbody>
         </table>
       </div>
+
+      {/* ---------- CONTROLES DE PAGINACIÓN ---------- */}
+      {surveys.length > 0 && (
+        <div className="flex items-center justify-between gap-4 mt-4">
+          <div className="text-sm text-gray-600">
+            {/* calculo índices mostrados */}
+            {(() => {
+              const total = surveys.length
+              const start = pageSize > 0 ? (currentPage - 1) * pageSize + 1 : 1
+              const end = pageSize > 0 ? Math.min(currentPage * pageSize, total) : total
+              return `Mostrando ${start}–${end} de ${total}`
+            })()}
+          </div>
+
+          <div className="flex items-center gap-3">
+            <label className="text-sm text-gray-600 mr-2">Filas:</label>
+            <select
+              value={pageSize}
+              onChange={(e) => handlePageSizeChange(Number(e.target.value))}
+              className="px-2 py-1 border rounded"
+            >
+              <option value={5}>5</option>
+              <option value={10}>10</option>
+              <option value={20}>20</option>
+              <option value={0}>Todos</option>
+            </select>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => gotoPage(1)}
+              disabled={currentPage === 1}
+              className="px-2 py-1 rounded disabled:opacity-50 border"
+              title="Primera"
+            >
+              {"<<"}
+            </button>
+            <button
+              onClick={() => gotoPage(currentPage - 1)}
+              disabled={currentPage === 1}
+              className="px-2 py-1 rounded disabled:opacity-50 border flex items-center gap-1"
+            >
+              <ChevronLeft size={14} /> Anterior
+            </button>
+
+            {/* Números de página (limitado a un rango razonable) */}
+            <div className="flex items-center gap-1 px-2">
+              {(() => {
+                const pages: number[] = []
+                // mostrar hasta 7 botones: current ±3
+                const range = 3
+                let start = Math.max(1, currentPage - range)
+                let end = Math.min(totalPages, currentPage + range)
+                // ajustar si estamos cerca del inicio o final para mostrar siempre hasta 7 si es posible
+                if (currentPage <= range) {
+                  end = Math.min(totalPages, 1 + range * 2)
+                }
+                if (currentPage + range > totalPages) {
+                  start = Math.max(1, totalPages - range * 2)
+                }
+                for (let i = start; i <= end; i++) pages.push(i)
+                return pages.map((p) => (
+                  <button
+                    key={p}
+                    onClick={() => gotoPage(p)}
+                    className={`px-3 py-1 rounded ${p === currentPage ? "bg-blue-600 text-white" : "border"}`}
+                  >
+                    {p}
+                  </button>
+                ))
+              })()}
+            </div>
+
+            <button
+              onClick={() => gotoPage(currentPage + 1)}
+              disabled={currentPage === totalPages}
+              className="px-2 py-1 rounded disabled:opacity-50 border flex items-center gap-1"
+            >
+              Siguiente <ChevronRight size={14} />
+            </button>
+            <button
+              onClick={() => gotoPage(totalPages)}
+              disabled={currentPage === totalPages}
+              className="px-2 py-1 rounded disabled:opacity-50 border"
+              title="Última"
+            >
+              {">>"}
+            </button>
+          </div>
+        </div>
+      )}
 
       {showModal && (
         <div className="fixed inset-0 bg-[rgba(0,0,0,0.50)]  flex items-center justify-center z-50 p-4">
@@ -578,9 +730,8 @@ export default function EncuestasPage() {
                       onDragStart={() => handleDragStart(index)}
                       onDragOver={handleDragOver}
                       onDrop={() => handleDrop(index)}
-                      className={`question-item flex items-start justify-between bg-gradient-to-r from-blue-50 to-blue-25 p-4 rounded-lg border border-blue-200 cursor-move hover:shadow-md ${
-                        draggedIndex === index ? "dragging" : ""
-                      }`}
+                      className={`question-item flex items-start justify-between bg-gradient-to-r from-blue-50 to-blue-25 p-4 rounded-lg border border-blue-200 cursor-move hover:shadow-md ${draggedIndex === index ? "dragging" : ""
+                        }`}
                     >
                       <div className="flex items-start gap-3 flex-1">
                         <GripVertical
@@ -773,9 +924,8 @@ export default function EncuestasPage() {
                       onDragStart={() => handleDragStartAnswer(index)}
                       onDragOver={handleDragOver}
                       onDrop={() => handleDropAnswer(index)}
-                      className={`answer-item flex items-start justify-between bg-gradient-to-r from-green-50 to-green-25 p-4 rounded-lg border border-green-200 cursor-move hover:shadow-md ${
-                        draggedAnswerIndex === index ? "dragging" : ""
-                      }`}
+                      className={`answer-item flex items-start justify-between bg-gradient-to-r from-green-50 to-green-25 p-4 rounded-lg border border-green-200 cursor-move hover:shadow-md ${draggedAnswerIndex === index ? "dragging" : ""
+                        }`}
                     >
                       <div className="flex items-start gap-3 flex-1">
                         <GripVertical
