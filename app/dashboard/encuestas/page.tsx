@@ -359,14 +359,44 @@ const handleSubmit = async (e: React.FormEvent) => {
 }
 
 
-  const handleDelete = (id: number) => {
-    // Sólo front: eliminar de la lista local
+  const handleDelete = async (id: number) => {
+    // Confirmación rápida en el cliente
+    const ok = confirm("¿Estás seguro que quieres eliminar esta encuesta? Esta acción no se puede deshacer.")
+    if (!ok) return
+
+    // Optimistic update: guardar estado previo para rollback si falla
+    const previous = surveys
     const newList = surveys.filter((survey) => survey.id !== id)
     setSurveys(newList)
 
     // ajustar página si era la última y quedó vacía
     const newTotalPages = pageSize > 0 ? Math.max(1, Math.ceil(newList.length / pageSize)) : 1
     if (currentPage > newTotalPages) setCurrentPage(newTotalPages)
+
+    try {
+      const res = await fetch("/api/surveysdelete", {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id }),
+      })
+
+      const result = await res.json()
+
+      if (!res.ok || !result.success) {
+        throw new Error(result?.error || "Error al eliminar encuesta")
+      }
+
+      // opcional: mostrar notificación de éxito
+      // alert('Encuesta eliminada correctamente')
+    } catch (err) {
+      console.error("Error eliminando encuesta:", err)
+      // Revertir cambio local
+      setSurveys(previous)
+      // ajustar página nuevamente
+      const restoredTotalPages = pageSize > 0 ? Math.max(1, Math.ceil(previous.length / pageSize)) : 1
+      if (currentPage > restoredTotalPages) setCurrentPage(restoredTotalPages)
+      alert("No se pudo eliminar la encuesta. Por favor, inténtalo de nuevo.")
+    }
   }
 
   const handleCloseModal = () => {
