@@ -321,7 +321,7 @@ const handleSubmit = async (e: React.FormEvent) => {
 
     console.log("Enviando encuesta:", payload)
 
-    const response = await fetch(editingId ? "/api/surveysupdate" : "/api/surveyscreate", {
+    const response = await fetch(editingId ? "/api/surveys/surveysupdate" : "/api/surveys/surveyscreate", {
       method: editingId ? "PUT" : "POST", // 👈 usar PUT si edita
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(payload),
@@ -374,7 +374,7 @@ const handleSubmit = async (e: React.FormEvent) => {
     if (currentPage > newTotalPages) setCurrentPage(newTotalPages)
 
     try {
-      const res = await fetch("/api/surveysdelete", {
+      const res = await fetch("/api/surveys/surveysdelete", {
         method: "DELETE",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ id }),
