@@ -141,24 +141,25 @@ const handleEdit = async (survey: Survey) => {
 
     // 🔹 Llamar al endpoint que devuelve preguntas y respuestas de esa encuesta
     const res = await fetch(`/api/surveys/${survey.id}`)
-    const data = await res.json()
+const data = await res.json()
 
-    if (data && Array.isArray(data.questions)) {
-      setQuestions(
-        data.questions.map((q: any) => ({
-          id: q.id,
-          text: q.text,
-          prefix: q.prefix,
-          description: q.description,
-          answers: q.answers?.map((a: any) => ({
-            id: a.id,
-            text: a.text,
-          })) ?? [],
-        }))
-      )
-    } else {
-      setQuestions([])
-    }
+if (data && Array.isArray(data.questions)) {
+  setQuestions(
+    data.questions.map((q: any) => ({
+      id: q.id,
+      text: q.text,
+      prefix: q.prefix,
+      description: q.description,
+      answers: q.options?.map((a: any) => ({
+        id: a.id,
+        text: a.text,
+      })) ?? [],
+    }))
+  )
+} else {
+  setQuestions([])
+}
+
 
     setShowModal(true)
   } catch (err) {
