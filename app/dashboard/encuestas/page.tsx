@@ -128,7 +128,8 @@ export default function EncuestasPage() {
     }))
   }
 
-  const handleEdit = (survey: Survey) => {
+const handleEdit = async (survey: Survey) => {
+  try {
     setEditingId(survey.id)
     setFormData({
       title: survey.title,
@@ -137,9 +138,35 @@ export default function EncuestasPage() {
       endDate: survey.endDate,
       active: survey.status === "Activa",
     })
-    setQuestions(survey.questions || [])
+
+    // 🔹 Llamar al endpoint que devuelve preguntas y respuestas de esa encuesta
+    const res = await fetch(`/api/surveys/${survey.id}`)
+    const data = await res.json()
+
+    if (data && Array.isArray(data.questions)) {
+      setQuestions(
+        data.questions.map((q: any) => ({
+          id: q.id,
+          text: q.text,
+          prefix: q.prefix,
+          description: q.description,
+          answers: q.answers?.map((a: any) => ({
+            id: a.id,
+            text: a.text,
+          })) ?? [],
+        }))
+      )
+    } else {
+      setQuestions([])
+    }
+
     setShowModal(true)
+  } catch (err) {
+    console.error("Error al cargar la encuesta completa:", err)
+    alert("No se pudieron cargar las preguntas de la encuesta.")
   }
+}
+
 
   const handleOpenQuestionsModal = () => {
     setShowQuestionsModal(true)
@@ -267,50 +294,69 @@ export default function EncuestasPage() {
     setDraggedAnswerIndex(null)
   }
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
+const handleSubmit = async (e: React.FormEvent) => {
+  e.preventDefault()
 
-    try {
-      const payload = {
-        title: formData.title,
-        description: formData.description,
-        startDate: formData.startDate,
-        endDate: formData.endDate,
-        active: formData.active,
-        questions: questions.map((q) => ({
-          prefix: q.prefix ?? null,
-          text: q.text,
-          answers:
-            q.answers?.map((a) => ({
-              text: a.text,
-            })) ?? [],
-        })),
-      }
-
-      console.log("Enviando encuesta:", payload)
-
-      const response = await fetch("/api/surveyscreate", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
-      })
-
-      const result = await response.json()
-
-      if (result.success) {
-        alert("✅ Encuesta guardada correctamente")
-        setShowModal(false)
-        setFormData({ title: "", description: "", startDate: "", endDate: "", active: false })
-        setQuestions([])
-        // refrescar lista (si prefieres que venga del backend, haz otro fetch aquí)
-      } else {
-        alert("❌ Error al guardar la encuesta: " + result.error)
-      }
-    } catch (err) {
-      console.error(err)
-      alert("❌ Error inesperado al guardar")
+  try {
+    const payload = {
+      id: editingId, // 👈 Agregar ID para actualización
+      title: formData.title,
+      description: formData.description,
+      startDate: formData.startDate,
+      endDate: formData.endDate,
+      active: formData.active,
+      questions: questions.map((q) => ({
+        id: q.id, // 👈 mantener ID si existe
+        prefix: q.prefix ?? null,
+        text: q.text,
+        description: q.description,
+        answers:
+          q.answers?.map((a) => ({
+            id: a.id,
+            text: a.text,
+          })) ?? [],
+      })),
     }
+
+    console.log("Enviando encuesta:", payload)
+
+    const response = await fetch(editingId ? "/api/surveysupdate" : "/api/surveyscreate", {
+      method: editingId ? "PUT" : "POST", // 👈 usar PUT si edita
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    })
+
+    const result = await response.json()
+
+    if (result.success) {
+      alert(editingId ? "✅ Encuesta actualizada correctamente" : "✅ Encuesta creada correctamente")
+      setShowModal(false)
+      setEditingId(null)
+      setFormData({ title: "", description: "", startDate: "", endDate: "", active: false })
+      setQuestions([])
+
+      // refrescar lista
+      const refreshed = await fetch("/api/surveys")
+      const data = await refreshed.json()
+      setSurveys(
+        data.map((s: any) => ({
+          id: s.id,
+          title: s.title,
+          description: s.description ?? "",
+          status: s.is_active ? "Activa" : "Inactiva",
+          startDate: s.starts_at?.split("T")[0] ?? "",
+          endDate: s.ends_at?.split("T")[0] ?? "",
+        }))
+      )
+    } else {
+      alert("❌ Error al guardar la encuesta: " + result.error)
+    }
+  } catch (err) {
+    console.error(err)
+    alert("❌ Error inesperado al guardar")
   }
+}
+
 
   const handleDelete = (id: number) => {
     // Sólo front: eliminar de la lista local
