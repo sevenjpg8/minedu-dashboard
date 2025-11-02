@@ -1,3 +1,4 @@
+// reportes/page.tsx
 "use client"
 
 import { useEffect, useState } from "react"
@@ -34,6 +35,7 @@ export default function ReportesPage() {
   const [dres, setDres] = useState<any[]>([])
   const [ugels, setUgels] = useState<any[]>([])
   const [schools, setSchools] = useState<any[]>([])
+  const [loading, setLoading] = useState(true)
 
   const handleFilterChange = (key: string, value: string) => {
     setFilters((prev) => ({ ...prev, [key]: value }))
@@ -131,6 +133,7 @@ export default function ReportesPage() {
   useEffect(() => {
     const fetchCharts = async () => {
       if (!filters.encuesta) return;
+      setLoading(true);
 
       const params = new URLSearchParams(
         Object.entries(filters).filter(([_, v]) => v !== "")
@@ -144,36 +147,8 @@ export default function ReportesPage() {
         return;
       }
 
-      let filteredData = data.charts;
-
-      // 🔹 Filtrado adicional por DRE / UGEL / colegio
-      filteredData = filteredData.filter((row: any) => {
-        // Filtrar por DRE
-        if (filters.dre) {
-          const dreMatch = row.survey_participation?.school?.ugel?.some(
-            (u: any) => u.dre?.id === Number(filters.dre)
-          );
-          if (!dreMatch) return false;
-        }
-
-        // Filtrar por UGEL
-        if (filters.ugel) {
-          const ugelMatch = row.survey_participation?.school?.ugel?.some(
-            (u: any) => u.id === Number(filters.ugel)
-          );
-          if (!ugelMatch) return false;
-        }
-
-        // Filtrar por colegio individual
-        if (filters.colegio) {
-          if (row.survey_participation?.school?.id !== Number(filters.colegio))
-            return false;
-        }
-
-        return true;
-      });
-
-      setCharts(filteredData);
+      setCharts(data.charts || []);
+      setLoading(false);
     };
 
     fetchCharts();
@@ -311,7 +286,9 @@ export default function ReportesPage() {
       </div>
 
       {/* Gráficos */}
-      {showCharts ? (
+      {loading ? (
+        <div className="text-center p-12 text-gray-600">Cargando reportes...</div>
+      ) : showCharts ? (
         charts.length > 0 ? (
           <div className="grid grid-cols-2 gap-6">
             {charts.map((chart, i) => (
@@ -328,6 +305,7 @@ export default function ReportesPage() {
           <p className="text-gray-600">Por favor, seleccione una encuesta para ver los resultados.</p>
         </div>
       )}
+
 
     </div>
   )

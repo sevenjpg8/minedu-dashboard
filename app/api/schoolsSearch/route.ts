@@ -1,26 +1,30 @@
-import { NextResponse } from "next/server";
-import { supabase } from "@/lib/supabaseClient";
+// app/api/schoolsSearch/route.ts
+import { NextResponse } from "next/server"
+import { supabase } from "@/lib/supabaseClient"
 
 export async function GET(req: Request) {
-  const { searchParams } = new URL(req.url);
-  const ugelId = searchParams.get("ugelId");
-  const query = searchParams.get("query");
+  const { searchParams } = new URL(req.url)
+  const ugelId = searchParams.get("ugelId")
+  const query = searchParams.get("query")
 
   if (!ugelId || !query) {
-    return NextResponse.json([]);
+    return NextResponse.json([])
   }
 
-  const { data, error } = await supabase
-    .from("schools")
-    .select("id, name, nivel_educativo")
-    .eq("ugel_id", ugelId)
-    .ilike("name", `%${query}%`)
-    .limit(20);
+  try {
+    // Buscar colegios de la UGEL cuyo nombre contenga el texto buscado
+    const { data, error } = await supabase
+      .from("schools")
+      .select("id, name, nivel_educativo")
+      .eq("ugel_id", Number(ugelId))
+      .ilike("name", `%${query}%`)
+      .order("name", { ascending: true })
+      .limit(20) // límite para autocompletado
 
-  if (error) {
-    console.error(error);
-    return NextResponse.json([]);
+    if (error) throw error
+    return NextResponse.json(data || [])
+  } catch (err) {
+    console.error("Error en /api/schoolsSearch:", err)
+    return NextResponse.json([], { status: 500 })
   }
-
-  return NextResponse.json(data);
 }
