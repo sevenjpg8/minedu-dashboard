@@ -346,6 +346,7 @@ export default function EncuestasPage() {
       const result = await response.json()
 
       if (result.success) {
+        // Mostramos el alert justo antes de cerrar el loading
         setTimeout(() => {
           setAlertDialog({
             isOpen: true,
@@ -355,6 +356,8 @@ export default function EncuestasPage() {
               : "✅ Encuesta creada correctamente",
             type: "success",
           })
+
+          // Cerramos modal y limpiamos todo
           setShowModal(false)
           setEditingId(null)
           setFormData({
@@ -366,6 +369,7 @@ export default function EncuestasPage() {
           })
           setQuestions([])
 
+          // Refrescamos encuestas
           fetch("/api/surveys")
             .then((response) => response.json())
             .then((data) => {
@@ -383,9 +387,15 @@ export default function EncuestasPage() {
               }
             })
             .catch((err) => console.error("Error cargando encuestas:", err))
-            .finally(() => setIsSubmitting(false))
-        }, 1400) // <-- aquí agregas el retardo
+            // Ahora apagamos el loading un poco después de mostrar el alert
+            .finally(() => {
+              setTimeout(() => setIsSubmitting(false), 300) // 🔹 se superpone suavemente
+            })
+        }, 4500) // 🔹 el alert aparece antes de que termine el loading
       }
+
+
+
       else {
         setAlertDialog({
           isOpen: true,
@@ -489,7 +499,7 @@ export default function EncuestasPage() {
       <LoadingDialog
         isOpen={isSubmitting}
         message={editingId ? "Actualizando encuesta..." : "Creando encuesta..."}
-        duration={1400}
+        duration={5000}
         onClose={() => setIsSubmitting(false)}
       />
 
