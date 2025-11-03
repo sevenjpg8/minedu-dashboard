@@ -79,6 +79,15 @@ export default function Header() {
             Reportes
           </Link>
           <Link
+            href="/dashboard/tabla-progreso"
+            className={`pb-4 border-b-2 font-medium transition-colors ${isActive("/dashboard/tabla-progreso")
+                ? "text-gray-900 border-blue-500"
+                : "text-gray-600 border-transparent hover:text-gray-900"
+              }`}
+          >
+            Progreso
+          </Link>
+          <Link
             href="/dashboard/importar"
             className={`pb-4 border-b-2 font-medium transition-colors ${
               isActive("/dashboard/importar")
