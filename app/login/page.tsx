@@ -6,6 +6,7 @@ import { useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Checkbox } from "@/components/ui/checkbox"
+import { ErrorAlert } from "@/components/ui/error-alert"
 import Link from "next/link"
 
 export default function LoginPage() {
@@ -13,13 +14,33 @@ export default function LoginPage() {
   const [password, setPassword] = useState("")
   const [rememberMe, setRememberMe] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setIsLoading(true)
-    // Aquí iría la lógica de autenticación
-    console.log("Login attempt:", { email, password, rememberMe })
-    setTimeout(() => setIsLoading(false), 1000)
+    setError(null)
+
+    try {
+      const res = await fetch("/api/logueo", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email, password }),
+      })
+
+      if (res.ok) {
+        // ✅ Login correcto → redirigir
+        window.location.href = "/dashboard"
+      } else {
+        const data = await res.json()
+        setError(data.message || "Error al iniciar sesión")
+      }
+    } catch (error) {
+      console.error(error)
+      setError("Error del servidor")
+    } finally {
+      setIsLoading(false)
+    }
   }
 
   return (
@@ -29,17 +50,19 @@ export default function LoginPage() {
         <div className="flex justify-center mb-8">
           <div className="flex items-center gap-2">
             <div className="w-15 h-15 rounded flex items-center justify-center">
-              <img
-                src="/logo-minedu.png"
-                alt="Logo Ministerio de Educación"
-                className="w-20 h-20 object-contain"
-              />
+              <img src="/logo-minedu.png" alt="Logo Ministerio de Educación" className="w-20 h-20 object-contain" />
             </div>
           </div>
         </div>
 
         {/* Form Card */}
         <div className="bg-white rounded-lg shadow-md p-8">
+          {error && (
+            <div className="mb-6">
+              <ErrorAlert message={error} onClose={() => setError(null)} />
+            </div>
+          )}
+
           <form onSubmit={handleSubmit} className="space-y-6">
             {/* Email Field */}
             <div className="space-y-2">

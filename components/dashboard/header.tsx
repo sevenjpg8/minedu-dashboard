@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef } from "react"
 import { ChevronDown } from "lucide-react"
 import Link from "next/link"
-import { usePathname } from "next/navigation"
+import { usePathname, useRouter } from "next/navigation"
 
 export default function Header() {
   const [isDropdownOpen, setIsDropdownOpen] = useState(false)
@@ -24,6 +24,28 @@ export default function Header() {
       document.removeEventListener("mousedown", handleClickOutside)
     }
   }, [])
+
+  const router = useRouter()
+
+  const handleLogout = async () => {
+    try {
+      const res = await fetch("/api/logout", {
+        method: "POST",
+        credentials: "include", // importante para enviar/recibir cookies
+      })
+
+      if (res.ok) {
+        // Redirigir al login
+        router.push("/login")
+      } else {
+        alert("Error al cerrar sesión")
+      }
+    } catch (error) {
+      console.error(error)
+      alert("Error del servidor")
+    }
+  }
+
 
   return (
     <header className="bg-white border-b border-gray-200 px-8 py-4 flex items-center justify-between">
@@ -86,7 +108,7 @@ export default function Header() {
               <a href="#" className="block px-4 py-2 text-gray-700 hover:bg-gray-100">
                 Configuración
               </a>
-              <a href="#" className="block px-4 py-2 text-gray-700 hover:bg-gray-100 border-t border-gray-200">
+              <a href="#" onClick={handleLogout} className="block px-4 py-2 text-gray-700 hover:bg-gray-100 border-t border-gray-200">
                 Cerrar sesión
               </a>
             </div>
