@@ -1,19 +1,17 @@
 import { NextResponse } from "next/server"
-import { supabase } from "@/lib/supabaseClient" // Asegúrate de tener esta instancia
+import { supabase } from "@/lib/supabaseClient"
 
 export async function POST(req: Request) {
   try {
     const { email, password } = await req.json()
 
-    // Validación simple
     if (!email || !password) {
       return NextResponse.json({ message: "Faltan credenciales" }, { status: 400 })
     }
 
-    // 🔹 Buscar usuario en la tabla "usuarios"
     const { data: user, error } = await supabase
       .from("usuarios")
-      .select("*")
+      .select("id, password, rol_id") // 👈 Traemos también el rol_id
       .eq("email", email)
       .single()
 
@@ -21,16 +19,16 @@ export async function POST(req: Request) {
       return NextResponse.json({ message: "Usuario no encontrado" }, { status: 401 })
     }
 
-    // 🔹 Verificar contraseña (en texto plano por ahora)
-    // ⚠️ En producción deberías usar bcrypt.compare(password, user.password)
     if (password !== user.password) {
       return NextResponse.json({ message: "Contraseña incorrecta" }, { status: 401 })
     }
 
-    // 🔹 Si todo está bien, crear respuesta y guardar cookie
-    const response = NextResponse.json({ message: "Login exitoso" })
+    // 🔹 Guardamos tanto el id como el rol_id
+    const payload = { id: user.id, rol_id: user.rol_id }
+    const encoded = Buffer.from(JSON.stringify(payload)).toString("base64")
 
-    response.cookies.set("auth_token", user.id.toString(), {
+    const response = NextResponse.json({ message: "Login exitoso" })
+    response.cookies.set("auth_token", encoded, {
       httpOnly: true,
       secure: process.env.NODE_ENV === "production",
       path: "/",

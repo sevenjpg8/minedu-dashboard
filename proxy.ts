@@ -25,6 +25,26 @@ export default function proxy(req: NextRequest) {
     return NextResponse.redirect(new URL("/dashboard", req.url))
   }
 
+  // 🔹 Si hay token, verificamos el rol
+  if (token) {
+    try {
+      const decoded = JSON.parse(Buffer.from(token, "base64").toString("utf-8"))
+      const rol_id = decoded.rol_id
+
+      // 🔒 Restricciones para ESPECIALISTA (rol_id = 2)
+      if (rol_id === 2 && pathname.startsWith("/dashboard/encuestas")) {
+        return NextResponse.redirect(new URL("/dashboard", req.url))
+      }
+
+    } catch (error) {
+      console.error("Error decodificando token:", error)
+      // Si el token está corrupto o inválido → cerrar sesión
+      const res = NextResponse.redirect(new URL("/login", req.url))
+      res.cookies.delete("auth_token")
+      return res
+    }
+  }
+
   return NextResponse.next()
 }
 
