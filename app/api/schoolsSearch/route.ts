@@ -14,7 +14,7 @@ export async function GET(req: Request) {
   try {
     // Buscar colegios de la UGEL cuyo nombre contenga el texto buscado
     const { data, error } = await supabase
-      .from("schools")
+      .from("school_new")
       .select("id, name, nivel_educativo")
       .eq("ugel_id", Number(ugelId))
       .ilike("name", `%${query}%`)

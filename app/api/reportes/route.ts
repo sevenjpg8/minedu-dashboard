@@ -46,7 +46,7 @@ export async function GET(req: Request) {
     if (dreId) {
       // 1️⃣ Obtener todas las UGELs de la DRE
       const { data: ugels, error: ugelError } = await supabase
-        .from("ugels")
+        .from("ugel_new")
         .select("id")
         .eq("dre_id", Number(dreId));
 
@@ -66,7 +66,7 @@ export async function GET(req: Request) {
 
       while (hasMore) {
         const { data, error } = await supabase
-          .from("schools")
+          .from("school_new")
           .select("id, ugel_id")
           .in("ugel_id", ugelIds)
           .range(from, from + pageSize - 1);
@@ -94,7 +94,7 @@ export async function GET(req: Request) {
     
     if (ugelId) {
       const { data: schoolsUgel, error: ugelError } = await supabase
-        .from("schools")
+        .from("school_new")
         .select("id, ugel_id")
         .eq("ugel_id", ugelId)
 

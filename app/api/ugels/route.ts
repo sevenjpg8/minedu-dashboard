@@ -5,7 +5,7 @@ export async function GET(req: Request) {
   const { searchParams } = new URL(req.url)
   const dreId = searchParams.get("dreId")
 
-  const query = supabase.from("ugels").select("id, name")
+  const query = supabase.from("ugel_new").select("id, name")
 
   if (dreId) query.eq("dre_id", dreId)
 
