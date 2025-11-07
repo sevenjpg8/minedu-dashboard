@@ -4,7 +4,7 @@ import { supabase } from "@/lib/supabaseClient"
 
 interface AnswerRow {
   id: number
-  question: { text: string } | null
+  question: { id: number; text: string } | null
   option: { text: string } | null
   survey_participation: {
     survey_id: number
@@ -46,7 +46,7 @@ export async function GET(req: Request) {
     if (dreId) {
       // 1️⃣ Obtener todas las UGELs de la DRE
       const { data: ugels, error: ugelError } = await supabase
-        .from("ugels")
+        .from("ugel_new")
         .select("id")
         .eq("dre_id", Number(dreId));
 
@@ -66,7 +66,7 @@ export async function GET(req: Request) {
 
       while (hasMore) {
         const { data, error } = await supabase
-          .from("schools")
+          .from("school_new")
           .select("id, ugel_id")
           .in("ugel_id", ugelIds)
           .range(from, from + pageSize - 1);
@@ -94,7 +94,7 @@ export async function GET(req: Request) {
     
     if (ugelId) {
       const { data: schoolsUgel, error: ugelError } = await supabase
-        .from("schools")
+        .from("school_new")
         .select("id, ugel_id")
         .eq("ugel_id", ugelId)
 
@@ -151,7 +151,7 @@ export async function GET(req: Request) {
       .from("answers")
       .select(`
         id,
-        question:question_id(text),
+        question:question_id(id, text),
         option:option_id(text)
       `)
       .in("survey_participation_id", filteredIds)
@@ -175,13 +175,18 @@ export async function GET(req: Request) {
     }
 
     // 5️⃣ Convertir en formato para Recharts
-    const charts = Object.entries(agrupado).map(([pregunta, opciones]) => ({
-      question: pregunta,
-      data: Object.entries(opciones).map(([name, count]) => ({
-        name,
-        "# de Respuestas": count,
-      })),
-    }))
+    const charts = Object.entries(agrupado).map(([pregunta, opciones]) => {
+      const firstRow = data.find((r) => r.question?.text === pregunta)
+      return {
+        id: firstRow?.question?.id ?? 0,
+        question: pregunta,
+        data: Object.entries(opciones).map(([name, count]) => ({
+          name,
+          "# de Respuestas": count,
+        })),
+      }
+    })
+
 
     return NextResponse.json({ success: true, charts })
   } catch (err) {
