@@ -53,7 +53,8 @@ export default function ReportesPage() {
     })
     setUgels([])
     setSchools([])
-
+    setFilteredSchools([]) // 🔹 limpiar resultados de búsqueda
+    setCharts([])
   }
 
   // Cargar encuestas y DREs al inicio
@@ -69,8 +70,19 @@ export default function ReportesPage() {
       setSchools([])
       return
     }
-    fetch(`/api/ugels?dreId=${filters.dre}`).then((res) => res.json()).then(setUgels)
+
+    fetch(`/api/ugels?dreId=${filters.dre}`)
+      .then((res) => res.json())
+      .then((data) => {
+        // 🔒 Asegurar que siempre sea un array
+        setUgels(Array.isArray(data) ? data : [])
+      })
+      .catch((err) => {
+        console.error("Error cargando UGELs:", err)
+        setUgels([]) // en caso de error también limpia
+      })
   }, [filters.dre])
+
 
   // Cargar colegios al seleccionar UGEL
   useEffect(() => {
@@ -88,6 +100,10 @@ export default function ReportesPage() {
   const handleSearchSchool = async (value: string) => {
     handleFilterChange("colegioNombre", value)
     setFilteredSchools([])
+
+    if (value !== filters.colegioNombre) {
+      setFilters((prev) => ({ ...prev, colegio: "", nivelEducativo: "", grado: "" }))
+    }
 
     if (!filters.ugel || value.length < 3) return // espera que escriba al menos 3 letras
 
@@ -115,6 +131,7 @@ export default function ReportesPage() {
       colegio: school.id,
       colegioNombre: school.name,
       nivelEducativo: normalizarNivel(school.nivel_educativo),
+      grado: "",
     }))
   }
 
@@ -122,7 +139,7 @@ export default function ReportesPage() {
   const level = filters.nivelEducativo || ""
   const gradeOptions =
     level.toLowerCase() === "primaria"
-      ? ["1", "2", "3", "4", "5", "6"]
+      ? ["4", "5", "6"]
       : level.toLowerCase() === "secundaria"
         ? ["1", "2", "3", "4", "5"]
         : [] // 🔒 si es inicial u otro, no hay grados disponibles
@@ -144,11 +161,18 @@ export default function ReportesPage() {
 
       if (!data.success) {
         setCharts([]);
+        setLoading(false);
         return;
       }
 
-      setCharts(data.charts || []);
-      setLoading(false);
+      const sortedCharts = [...(data.charts || [])].sort((a, b) => {
+        const idA = a.id ?? 0
+        const idB = b.id ?? 0
+        return idA - idB
+      })
+
+      setCharts(sortedCharts)
+      setLoading(false)
     };
 
     fetchCharts();
@@ -285,7 +309,6 @@ export default function ReportesPage() {
         </div>
       </div>
 
-      {/* Gráficos */}
       {loading ? (
         <div className="text-center p-12 text-gray-600">Cargando reportes...</div>
       ) : showCharts ? (
@@ -305,8 +328,6 @@ export default function ReportesPage() {
           <p className="text-gray-600">Por favor, seleccione una encuesta para ver los resultados.</p>
         </div>
       )}
-
-
     </div>
   )
 }
