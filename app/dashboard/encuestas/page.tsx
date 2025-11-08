@@ -56,7 +56,7 @@ export default function EncuestasPage() {
     isOpen: false,
     title: "",
     description: "",
-    onConfirm: () => {},
+    onConfirm: () => { },
   })
 
   const [alertDialog, setAlertDialog] = useState({
@@ -152,11 +152,18 @@ export default function EncuestasPage() {
               q.options?.map((a: any) => ({
                 id: a.id,
                 text: a.text,
-                nextQuestionIds: a.nextQuestionIds || [],
+                nextQuestionIds:
+                  Array.isArray(a.nextQuestionIds)
+                    ? a.nextQuestionIds
+                    : a.next_question_id
+                      ? [a.next_question_id]
+                      : [],
               })) ?? [],
           })),
         )
-      } else {
+      }
+
+      else {
         setQuestions([])
       }
 
@@ -205,11 +212,11 @@ export default function EncuestasPage() {
       const updatedQuestions = questions.map((q) =>
         q.id === editingQuestionId
           ? {
-              ...q,
-              text: editingQuestionText,
-              prefix: editingQuestionPrefix.trim() || null,
-              description: editingQuestionDescription,
-            }
+            ...q,
+            text: editingQuestionText,
+            prefix: editingQuestionPrefix.trim() || null,
+            description: editingQuestionDescription,
+          }
           : q,
       )
       setQuestions(updatedQuestions)

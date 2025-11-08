@@ -1,4 +1,3 @@
-// app/api/surveys/[id]/route.ts
 import { NextResponse } from "next/server"
 import { dbQuery } from "@/app/config/connection"
 
@@ -32,7 +31,7 @@ export async function GET(
 
     const survey = surveyResult.rows[0]
 
-    // ✅ 2. Obtener todas las preguntas
+    // ✅ 2. Obtener todas las preguntas de la encuesta
     const questionsResult = await dbQuery(
       `
       SELECT id, prefix, text
@@ -45,15 +44,14 @@ export async function GET(
 
     const questions = questionsResult.rows
 
-    // ✅ 3. Obtener todas las opciones relacionadas
+    // ✅ 3. Obtener todas las opciones relacionadas (con el next_question_id incluido)
     const questionIds = questions.map(q => q.id)
-
     let options: any[] = []
 
     if (questionIds.length > 0) {
       const optionsResult = await dbQuery(
         `
-        SELECT id, text, question_id
+        SELECT id, text, question_id, next_question_id
         FROM minedu.options
         WHERE question_id = ANY($1)
         `,
@@ -63,13 +61,19 @@ export async function GET(
       options = optionsResult.rows
     }
 
-    // ✅ 4. Combinar preguntas + opciones
+    // ✅ 4. Combinar preguntas + opciones, y normalizar next_question_id
     const questionsWithOptions = questions.map(q => ({
       ...q,
-      options: options.filter(o => o.question_id === q.id)
+      options: options
+        .filter(o => o.question_id === q.id)
+        .map(o => ({
+          id: o.id,
+          text: o.text,
+          nextQuestionIds: o.next_question_id ? [o.next_question_id] : []
+        }))
     }))
 
-    // ✅ 5. Respuesta final
+    // ✅ 5. Respuesta final completa
     return NextResponse.json({
       ...survey,
       questions: questionsWithOptions
