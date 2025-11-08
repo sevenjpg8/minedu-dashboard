@@ -23,7 +23,9 @@ export async function POST(req: Request) {
     ])
     const surveyId = surveyResult.rows[0].id
 
-    // 2️⃣ Insertar preguntas
+    // 2️⃣ Insertar preguntas y mapear ids temporales a ids reales
+    const questionIdMap: Record<number, number> = {} // key: id temporal del frontend, value: id real en DB
+
     for (const q of questions) {
       const insertQuestionQuery = `
         INSERT INTO minedu.questions
@@ -35,26 +37,31 @@ export async function POST(req: Request) {
         surveyId,
         1, // valor temporal para dimension_id
         q.text,
-        "multiple_choice", // valor por defecto
+        "multiple_choice",
         q.prefix,
         q.order ?? 0,
       ])
       const questionId = questionResult.rows[0].id
+      questionIdMap[q.id] = questionId
+    }
 
-      // 3️⃣ Insertar opciones
+    // 3️⃣ Insertar opciones con next_question_id
+    for (const q of questions) {
+      const questionId = questionIdMap[q.id]
+
       if (q.answers && q.answers.length > 0) {
-        const values = q.answers
-          .map((a: any, idx: number) =>
-            `(${questionId}, $${idx + 1}, NOW(), NOW())`
-          )
-          .join(", ")
+        for (const a of q.answers) {
+          const nextQuestionId =
+            a.nextQuestionIds && a.nextQuestionIds.length > 0
+              ? questionIdMap[a.nextQuestionIds[0]] || null
+              : null
 
-        const params = q.answers.map((a: any) => a.text)
-        const insertOptionsQuery = `
-          INSERT INTO minedu.options (question_id, text, created_at, updated_at)
-          VALUES ${values}
-        `
-        await dbQuery(insertOptionsQuery, params)
+          const insertOptionQuery = `
+            INSERT INTO minedu.options (question_id, text, created_at, updated_at, next_question_id)
+            VALUES ($1, $2, NOW(), NOW(), $3)
+          `
+          await dbQuery(insertOptionQuery, [questionId, a.text, nextQuestionId])
+        }
       }
     }
 

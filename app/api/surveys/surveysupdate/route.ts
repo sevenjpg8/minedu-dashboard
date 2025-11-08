@@ -15,13 +15,11 @@ export async function PUT(req: Request) {
 
     const surveyId = Number(id)
 
-    // 1️⃣ Actualizar la encuesta principal
+    // 1️⃣ Actualizar encuesta principal
     await dbQuery(
-      `
-      UPDATE minedu.surveys
-      SET title=$1, description=$2, starts_at=$3, ends_at=$4, is_active=$5, updated_at=NOW()
-      WHERE id=$6
-      `,
+      `UPDATE minedu.surveys
+       SET title=$1, description=$2, starts_at=$3, ends_at=$4, is_active=$5, updated_at=NOW()
+       WHERE id=$6`,
       [title, description, startDate, endDate, active ?? true, surveyId]
     )
     console.log("✅ Encuesta actualizada correctamente")
@@ -38,46 +36,24 @@ export async function PUT(req: Request) {
     const toDelete = existingQuestionIds.filter((qid: number) => !newIds.includes(qid))
 
     if (toDelete.length > 0) {
-      await dbQuery(
-        `DELETE FROM minedu.answers WHERE question_id = ANY($1::int[])`,
-        [toDelete]
-      )
-      await dbQuery(
-        `DELETE FROM minedu.options WHERE question_id = ANY($1::int[])`,
-        [toDelete]
-      )
-      await dbQuery(
-        `DELETE FROM minedu.questions WHERE id = ANY($1::int[])`,
-        [toDelete]
-      )
+      await dbQuery(`DELETE FROM minedu.options WHERE question_id = ANY($1::int[])`, [toDelete])
+      await dbQuery(`DELETE FROM minedu.questions WHERE id = ANY($1::int[])`, [toDelete])
       console.log("🗑️ Preguntas y opciones eliminadas:", toDelete)
     }
 
-    // 4️⃣ Actualizar o insertar preguntas
+    // 4️⃣ Actualizar o insertar preguntas y opciones con next_question_id
+    const questionIdMap: Record<number, number> = {} // id temporal -> id real
+
+    // Primero, mapear preguntas existentes
     for (const q of questions) {
       if (q.id && existingQuestionIds.includes(q.id)) {
-        // actualizar pregunta existente
-        await dbQuery(
-          `UPDATE minedu.questions
-           SET text=$1, prefix=$2, updated_at=NOW()
-           WHERE id=$3`,
-          [q.text, q.prefix ?? null, q.id]
-        )
-        // eliminar opciones viejas
-        await dbQuery(`DELETE FROM minedu.options WHERE question_id=$1`, [q.id])
-        // insertar nuevas opciones
-        if (q.answers && q.answers.length > 0) {
-          const optsQuery = q.answers
-            .map((a: any, i: number) => `($1, $${i + 2}, NOW(), NOW())`)
-            .join(", ")
-          const params = [q.id, ...q.answers.map((a: any) => a.text)]
-          await dbQuery(
-            `INSERT INTO minedu.options (question_id, text, created_at, updated_at) VALUES ${optsQuery}`,
-            params
-          )
-        }
-      } else {
-        // nueva pregunta
+        questionIdMap[q.id] = q.id
+      }
+    }
+
+    // Insertar nuevas preguntas primero para tener sus IDs
+    for (const q of questions) {
+      if (!q.id || !existingQuestionIds.includes(q.id)) {
         const insertQuestionRes = await dbQuery(
           `INSERT INTO minedu.questions (survey_id, dimension_id, text, prefix, type, created_at, updated_at)
            VALUES ($1, $2, $3, $4, 'multiple_choice', NOW(), NOW())
@@ -85,17 +61,30 @@ export async function PUT(req: Request) {
           [surveyId, 1, q.text, q.prefix ?? null]
         )
         const newQuestionId = insertQuestionRes.rows[0].id
+        questionIdMap[q.id] = newQuestionId
+      }
+    }
 
-        if (q.answers && q.answers.length > 0) {
-          const optsQuery = q.answers
-            .map((a: any, i: number) => `($1, $${i + 2}, NOW(), NOW())`)
-            .join(", ")
-          const params = [newQuestionId, ...q.answers.map((a: any) => a.text)]
-          await dbQuery(
-            `INSERT INTO minedu.options (question_id, text, created_at, updated_at) VALUES ${optsQuery}`,
-            params
-          )
-        }
+    // Ahora, insertar o actualizar opciones
+    for (const q of questions) {
+      const questionId = questionIdMap[q.id]
+      if (!q.answers || q.answers.length === 0) continue
+
+      // Borrar opciones viejas
+      await dbQuery(`DELETE FROM minedu.options WHERE question_id=$1`, [questionId])
+
+      // Insertar opciones con next_question_id
+      for (const a of q.answers) {
+        const nextQuestionId =
+          a.nextQuestionIds && a.nextQuestionIds.length > 0
+            ? questionIdMap[a.nextQuestionIds[0]] || null
+            : null
+
+        await dbQuery(
+          `INSERT INTO minedu.options (question_id, text, created_at, updated_at, next_question_id)
+           VALUES ($1, $2, NOW(), NOW(), $3)`,
+          [questionId, a.text, nextQuestionId]
+        )
       }
     }
 
