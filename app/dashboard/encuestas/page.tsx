@@ -3,7 +3,7 @@
 import type React from "react"
 
 import { useState, useEffect, useMemo } from "react"
-import { Trash2, Edit2, X, Plus, GripVertical, Settings, ChevronLeft, ChevronRight } from "lucide-react"
+import { Trash2, Edit2, X, Plus, GripVertical, Settings, ChevronLeft, ChevronRight, Link2 } from "lucide-react"
 import { ConfirmDialog } from "@/components/dialogs/confirm-dialog"
 import { AlertDialog } from "@/components/dialogs/alert-dialog"
 import { LoadingDialog } from "@/components/dialogs/loading-dialog"
@@ -11,6 +11,7 @@ import { LoadingDialog } from "@/components/dialogs/loading-dialog"
 interface Answer {
   id: number
   text: string
+  nextQuestionIds?: number[] // Agregar array de IDs de preguntas siguientes
 }
 
 interface Question {
@@ -39,7 +40,7 @@ export default function EncuestasPage() {
     isOpen: false,
     title: "",
     description: "",
-    onConfirm: () => { },
+    onConfirm: () => {},
   })
   const [alertDialog, setAlertDialog] = useState({
     isOpen: false,
@@ -110,6 +111,7 @@ export default function EncuestasPage() {
   const [showQuestionsModal, setShowQuestionsModal] = useState(false)
   const [showAnswersModal, setShowAnswersModal] = useState(false)
   const [showEditQuestionModal, setShowEditQuestionModal] = useState(false)
+  const [showLinkQuestionsModal, setShowLinkQuestionsModal] = useState(false) // Nuevo estado para modal de preguntas condicionales
   const [newQuestionPrefix, setNewQuestionPrefix] = useState("")
   const [editingId, setEditingId] = useState<number | null>(null)
   const [editingQuestionId, setEditingQuestionId] = useState<number | null>(null)
@@ -131,6 +133,8 @@ export default function EncuestasPage() {
   const [answers, setAnswers] = useState<Answer[]>([])
   const [newAnswer, setNewAnswer] = useState("")
   const [draggedAnswerIndex, setDraggedAnswerIndex] = useState<number | null>(null)
+  const [selectedAnswerId, setSelectedAnswerId] = useState<number | null>(null) // Nuevo estado para respuesta seleccionada
+  const [selectedNextQuestion, setSelectedNextQuestion] = useState<number | null>(null) // cambio de array a valor único para solo seleccionar una pregunta
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { name, value, type } = e.target as HTMLInputElement
@@ -165,6 +169,7 @@ export default function EncuestasPage() {
               q.options?.map((a: any) => ({
                 id: a.id,
                 text: a.text,
+                nextQuestionIds: a.nextQuestionIds || [], // Cargar preguntas condicionales
               })) ?? [],
           })),
         )
@@ -201,11 +206,11 @@ export default function EncuestasPage() {
       const updatedQuestions = questions.map((q) =>
         q.id === editingQuestionId
           ? {
-            ...q,
-            text: editingQuestionText,
-            prefix: editingQuestionPrefix.trim() || null,
-            description: editingQuestionDescription,
-          }
+              ...q,
+              text: editingQuestionText,
+              prefix: editingQuestionPrefix.trim() || null,
+              description: editingQuestionDescription,
+            }
           : q,
       )
       setQuestions(updatedQuestions)
@@ -244,11 +249,36 @@ export default function EncuestasPage() {
     setShowAnswersModal(true)
   }
 
+  const handleOpenLinkQuestionsModal = (answerId: number) => {
+    setSelectedAnswerId(answerId)
+    const answer = answers.find((a) => a.id === answerId)
+    setSelectedNextQuestion(answer?.nextQuestionIds?.[0] || null) // obtener solo el primer elemento del array
+    setShowLinkQuestionsModal(true)
+  }
+
+  const handleSaveLinkQuestions = () => {
+    if (selectedAnswerId) {
+      const updatedAnswers = answers.map(
+        (a) =>
+          a.id === selectedAnswerId ? { ...a, nextQuestionIds: selectedNextQuestion ? [selectedNextQuestion] : [] } : a, // guardar como array con un solo elemento
+      )
+      setAnswers(updatedAnswers)
+      setShowLinkQuestionsModal(false)
+      setSelectedAnswerId(null)
+      setSelectedNextQuestion(null) // limpiar selección
+    }
+  }
+
+  const toggleNextQuestion = (questionId: number) => {
+    setSelectedNextQuestion(selectedNextQuestion === questionId ? null : questionId) // toggle entre seleccionar/deseleccionar una sola pregunta
+  }
+
   const handleAddAnswer = () => {
     if (newAnswer.trim()) {
       const answer: Answer = {
         id: Date.now(),
         text: newAnswer,
+        nextQuestionIds: [], // Inicializar array de preguntas siguientes
       }
       setAnswers([...answers, answer])
       setNewAnswer("")
@@ -331,6 +361,7 @@ export default function EncuestasPage() {
             q.answers?.map((a) => ({
               id: a.id,
               text: a.text,
+              nextQuestionIds: a.nextQuestionIds || [], // Incluir preguntas condicionales en payload
             })) ?? [],
         })),
       }
@@ -351,9 +382,7 @@ export default function EncuestasPage() {
           setAlertDialog({
             isOpen: true,
             title: "¡Éxito!",
-            message: editingId
-              ? "✅ Encuesta actualizada correctamente"
-              : "✅ Encuesta creada correctamente",
+            message: editingId ? "✅ Encuesta actualizada correctamente" : "✅ Encuesta creada correctamente",
             type: "success",
           })
 
@@ -382,7 +411,7 @@ export default function EncuestasPage() {
                     status: s.is_active ? "Activa" : "Inactiva",
                     startDate: s.starts_at?.split("T")[0] ?? "",
                     endDate: s.ends_at?.split("T")[0] ?? "",
-                  }))
+                  })),
                 )
               }
             })
@@ -392,11 +421,7 @@ export default function EncuestasPage() {
               setTimeout(() => setIsSubmitting(false), 300) // 🔹 se superpone suavemente
             })
         }, 4500) // 🔹 el alert aparece antes de que termine el loading
-      }
-
-
-
-      else {
+      } else {
         setAlertDialog({
           isOpen: true,
           title: "Error",
@@ -547,8 +572,9 @@ export default function EncuestasPage() {
                   </td>
                   <td className="px-6 py-4">
                     <span
-                      className={`inline-block ${survey.status === "Activa" ? "bg-green-100 text-green-800" : "bg-gray-200 text-gray-700"
-                        } text-xs font-semibold px-3 py-1 rounded-full`}
+                      className={`inline-block ${
+                        survey.status === "Activa" ? "bg-green-100 text-green-800" : "bg-gray-200 text-gray-700"
+                      } text-xs font-semibold px-3 py-1 rounded-full`}
                     >
                       {survey.status}
                     </span>
@@ -894,8 +920,9 @@ export default function EncuestasPage() {
                       onDragStart={() => handleDragStart(index)}
                       onDragOver={handleDragOver}
                       onDrop={() => handleDrop(index)}
-                      className={`question-item flex items-start justify-between bg-gradient-to-r from-blue-50 to-blue-25 p-4 rounded-lg border border-blue-200 cursor-move hover:shadow-md ${draggedIndex === index ? "dragging" : ""
-                        }`}
+                      className={`question-item flex items-start justify-between bg-gradient-to-r from-blue-50 to-blue-25 p-4 rounded-lg border border-blue-200 cursor-move hover:shadow-md ${
+                        draggedIndex === index ? "dragging" : ""
+                      }`}
                     >
                       <div className="flex items-start gap-3 flex-1">
                         <GripVertical
@@ -1075,7 +1102,7 @@ export default function EncuestasPage() {
               <div className="bg-green-50 border border-green-200 rounded-lg p-3 mb-4">
                 <p className="text-sm text-green-700">
                   💡 <span className="font-semibold">Tip:</span> Agregue las opciones de respuesta para esta pregunta.
-                  Puede desplazarlas para cambiar el orden.
+                  Puede desplazarlas para cambiar el orden. Usa el icono 🔗 para enlazar preguntas siguientes.
                 </p>
               </div>
 
@@ -1088,8 +1115,9 @@ export default function EncuestasPage() {
                       onDragStart={() => handleDragStartAnswer(index)}
                       onDragOver={handleDragOver}
                       onDrop={() => handleDropAnswer(index)}
-                      className={`answer-item flex items-start justify-between bg-gradient-to-r from-green-50 to-green-25 p-4 rounded-lg border border-green-200 cursor-move hover:shadow-md ${draggedAnswerIndex === index ? "dragging" : ""
-                        }`}
+                      className={`answer-item flex items-start justify-between bg-gradient-to-r from-green-50 to-green-25 p-4 rounded-lg border border-green-200 cursor-move hover:shadow-md ${
+                        draggedAnswerIndex === index ? "dragging" : ""
+                      }`}
                     >
                       <div className="flex items-start gap-3 flex-1">
                         <GripVertical
@@ -1099,11 +1127,24 @@ export default function EncuestasPage() {
                         <div>
                           <p className="text-sm font-semibold text-green-600 mb-1">Opción {index + 1}</p>
                           <p className="text-gray-800">{answer.text}</p>
+                          {answer.nextQuestionIds && answer.nextQuestionIds.length > 0 && (
+                            <p className="text-xs text-blue-600 mt-1">
+                              🔗 {answer.nextQuestionIds.length} pregunta(s) siguiente(s)
+                            </p>
+                          )}
                         </div>
                       </div>
                       <button
+                        type="button"
+                        onClick={() => handleOpenLinkQuestionsModal(answer.id)}
+                        className="text-blue-600 hover:text-blue-800 ml-2 mt-1 flex-shrink-0 transition-colors"
+                        title="Enlazar preguntas siguientes"
+                      >
+                        <Link2 size={20} />
+                      </button>
+                      <button
                         onClick={() => handleDeleteAnswer(answer.id)}
-                        className="text-red-600 hover:text-red-800 ml-4 mt-1 flex-shrink-0 transition-colors"
+                        className="text-red-600 hover:text-red-800 ml-2 mt-1 flex-shrink-0 transition-colors"
                       >
                         <Trash2 size={20} />
                       </button>
@@ -1151,6 +1192,81 @@ export default function EncuestasPage() {
                   className="bg-green-600 hover:bg-green-700 text-white font-medium py-2 px-6 rounded-lg transition-colors"
                 >
                   Guardar Opciones
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showLinkQuestionsModal && selectedAnswerId && (
+        <div className="fixed inset-0 bg-[rgba(0,0,0,0.50)] flex items-center justify-center z-[80] p-4">
+          <div className="bg-white rounded-lg shadow-lg max-w-md w-full">
+            <div className="flex items-center justify-between p-6 border-b border-gray-200">
+              <div className="flex items-center gap-2">
+                <Link2 size={20} className="text-blue-600" />
+                <h2 className="text-lg font-bold text-gray-800">Pregunta Siguiente</h2>
+              </div>
+              <button
+                onClick={() => {
+                  setShowLinkQuestionsModal(false)
+                  setSelectedAnswerId(null)
+                  setSelectedNextQuestion(null)
+                }}
+                className="text-gray-500 hover:text-gray-700"
+              >
+                <X size={24} />
+              </button>
+            </div>
+
+            <div className="p-6 space-y-4">
+              <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
+                <p className="text-sm text-blue-700">
+                  Selecciona la pregunta que debe aparecer cuando se elija esta respuesta.
+                </p>
+              </div>
+
+              <div className="space-y-2 max-h-[60vh] overflow-y-auto">
+                {questions.length > 0 ? (
+                  questions.map((q, idx) => (
+                    <label
+                      key={q.id}
+                      className="flex items-start gap-3 p-3 border border-gray-200 rounded-lg hover:bg-gray-50 cursor-pointer"
+                    >
+                      <input
+                        type="radio"
+                        name="next-question"
+                        checked={selectedNextQuestion === q.id}
+                        onChange={() => toggleNextQuestion(q.id)}
+                        className="w-4 h-4 mt-1 text-blue-600 border-gray-300 rounded focus:ring-2 focus:ring-blue-500"
+                      />
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium text-gray-800">Pregunta {idx + 1}</p>
+                        <p className="text-sm text-gray-600 break-words">{q.text}</p>
+                      </div>
+                    </label>
+                  ))
+                ) : (
+                  <p className="text-gray-500 text-center py-8">No hay preguntas disponibles</p>
+                )}
+              </div>
+
+              <div className="flex justify-end gap-3 pt-4 border-t border-gray-200">
+                <button
+                  onClick={() => {
+                    setShowLinkQuestionsModal(false)
+                    setSelectedAnswerId(null)
+                    setSelectedNextQuestion(null)
+                  }}
+                  className="bg-gray-200 hover:bg-gray-300 text-gray-800 font-medium py-2 px-6 rounded-lg transition-colors"
+                >
+                  Cancelar
+                </button>
+                <button
+                  onClick={handleSaveLinkQuestions}
+                  className="bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-6 rounded-lg transition-colors"
+                >
+                  Guardar Enlace
                 </button>
               </div>
             </div>

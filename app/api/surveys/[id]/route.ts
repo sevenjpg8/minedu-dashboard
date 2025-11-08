@@ -1,68 +1,85 @@
+// app/api/surveys/[id]/route.ts
 import { NextResponse } from "next/server"
-import { supabase } from "@/lib/supabaseClient"
+import { dbQuery } from "@/app/config/connection"
 
 export async function GET(
   request: Request,
   context: { params: Promise<{ id: string }> }
 ) {
-  const { id } = await context.params
-  const idNumber = Number(id)
+  try {
+    const { id } = await context.params
+    const surveyId = Number(id)
 
-  // 🧠 1. Obtener la encuesta base
-  const { data: survey, error: surveyError } = await supabase
-    .from("surveys")
-    .select("*")
-    .eq("id", idNumber)
-    .single()
-
-  if (surveyError || !survey) {
-    console.error("❌ Error obteniendo encuesta:", surveyError)
-    return NextResponse.json({ error: "No se pudo cargar la encuesta" }, { status: 500 })
-  }
-
-  // 🧠 2. Obtener preguntas relacionadas
-  const { data: questions, error: questionsError } = await supabase
-    .from("questions")
-    .select(`
-      id,
-      prefix,
-      text
-    `)
-    .eq("survey_id", idNumber)
-
-  if (questionsError) {
-    console.error("❌ Error obteniendo preguntas:", questionsError)
-  }
-
-  // 🧠 3. Obtener opciones para cada pregunta
-  const questionIds = questions?.map(q => q.id) ?? []
-  let options: any[] = []
-
-  if (questionIds.length > 0) {
-    const { data: optionsData, error: optionsError } = await supabase
-      .from("options")
-      .select(`id, text, question_id`)
-      .in("question_id", questionIds)
-
-    if (optionsError) {
-      console.error("❌ Error obteniendo opciones:", optionsError)
-    } else {
-      options = optionsData ?? []
+    if (isNaN(surveyId)) {
+      return NextResponse.json(
+        { error: "ID inválido" },
+        { status: 400 }
+      )
     }
+
+    // ✅ 1. Obtener la encuesta base
+    const surveyResult = await dbQuery(
+      `SELECT * FROM minedu.surveys WHERE id = $1`,
+      [surveyId]
+    )
+
+    if (surveyResult.rowCount === 0) {
+      return NextResponse.json(
+        { error: "No se encontró la encuesta" },
+        { status: 404 }
+      )
+    }
+
+    const survey = surveyResult.rows[0]
+
+    // ✅ 2. Obtener todas las preguntas
+    const questionsResult = await dbQuery(
+      `
+      SELECT id, prefix, text
+      FROM minedu.questions
+      WHERE survey_id = $1
+      ORDER BY id ASC
+      `,
+      [surveyId]
+    )
+
+    const questions = questionsResult.rows
+
+    // ✅ 3. Obtener todas las opciones relacionadas
+    const questionIds = questions.map(q => q.id)
+
+    let options: any[] = []
+
+    if (questionIds.length > 0) {
+      const optionsResult = await dbQuery(
+        `
+        SELECT id, text, question_id
+        FROM minedu.options
+        WHERE question_id = ANY($1)
+        `,
+        [questionIds]
+      )
+
+      options = optionsResult.rows
+    }
+
+    // ✅ 4. Combinar preguntas + opciones
+    const questionsWithOptions = questions.map(q => ({
+      ...q,
+      options: options.filter(o => o.question_id === q.id)
+    }))
+
+    // ✅ 5. Respuesta final
+    return NextResponse.json({
+      ...survey,
+      questions: questionsWithOptions
+    })
+
+  } catch (error) {
+    console.error("❌ Error en /api/surveys/[id]:", error)
+    return NextResponse.json(
+      { error: "Error interno del servidor" },
+      { status: 500 }
+    )
   }
-
-  console.log("🧩 ID encuesta:", idNumber)
-console.log("🧩 Preguntas encontradas:", questions)
-
-  // 🧩 Combinar preguntas con sus opciones
-  const questionsWithOptions = questions?.map(q => ({
-    ...q,
-    options: options.filter(o => o.question_id === q.id)
-  })) ?? []
-
-  // 🧩 Resultado final
-  return NextResponse.json({
-    ...survey,
-    questions: questionsWithOptions
-  })
 }

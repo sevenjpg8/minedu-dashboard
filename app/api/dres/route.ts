@@ -1,16 +1,22 @@
-import { NextResponse } from "next/server"
-import { supabase } from "@/lib/supabaseClient"
+import { NextResponse } from "next/server";
+import { dbQuery } from "@/app/config/connection"; // ✅ tu conexión
 
 export async function GET() {
-  const { data, error } = await supabase
-    .from("dres")
-    .select("id, name")
-    .order("name", { ascending: true })
+  try {
+    const sql = `
+      SELECT id, name
+      FROM minedu.dres
+      ORDER BY name ASC
+    `;
 
-  if (error) {
-    console.error("Error cargando DRE:", error)
-    return NextResponse.json({ error: "No se pudieron cargar las DRE" }, { status: 500 })
+    const result = await dbQuery(sql);
+
+    return NextResponse.json(result.rows);
+  } catch (err) {
+    console.error("Error cargando DRE:", err);
+    return NextResponse.json(
+      { error: "No se pudieron cargar las DRE" },
+      { status: 500 }
+    );
   }
-
-  return NextResponse.json(data)
 }

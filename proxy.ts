@@ -26,19 +26,27 @@ export default function proxy(req: NextRequest) {
   }
 
   // 🔹 Si hay token, verificamos el rol
+  // 🔹 Validar rol desde cookie
   if (token) {
     try {
       const decoded = JSON.parse(Buffer.from(token, "base64").toString("utf-8"))
       const rol_id = decoded.rol_id
 
       // 🔒 Restricciones para ESPECIALISTA (rol_id = 2)
-      if (rol_id === 2 && pathname.startsWith("/dashboard/encuestas")) {
-        return NextResponse.redirect(new URL("/dashboard", req.url))
+      if (rol_id === 2) {
+        const rutasRestringidas = [
+          "/dashboard/encuestas",
+          "/dashboard/importar", // Ejemplo extra
+        ]
+
+        // Si intenta entrar a alguna ruta restringida → bloqueamos
+        if (rutasRestringidas.some((ruta) => pathname.startsWith(ruta))) {
+          return NextResponse.redirect(new URL("/dashboard", req.url))
+        }
       }
 
     } catch (error) {
       console.error("Error decodificando token:", error)
-      // Si el token está corrupto o inválido → cerrar sesión
       const res = NextResponse.redirect(new URL("/login", req.url))
       res.cookies.delete("auth_token")
       return res
@@ -47,6 +55,7 @@ export default function proxy(req: NextRequest) {
 
   return NextResponse.next()
 }
+
 
 export const config = {
   matcher: ["/dashboard/:path*", "/login"],

@@ -1,20 +1,33 @@
+// app/api/colegios/route.ts
 import { NextResponse } from "next/server"
-import { supabase } from "@/lib/supabaseClient"
+import { dbQuery } from "@/app/config/connection"
 
 export async function GET(req: Request) {
-  const { searchParams } = new URL(req.url)
-  const ugelId = searchParams.get("ugelId")
+  try {
+    const { searchParams } = new URL(req.url)
+    const ugelId = searchParams.get("ugelId")
 
-  const query = supabase.from("school_new").select("id, name")
+    let sql = `
+      SELECT id, name
+      FROM minedu.school_new
+    `
+    const params: any[] = []
 
-  if (ugelId) query.eq("ugel_id", ugelId)
+    if (ugelId) {
+      sql += ` WHERE ugel_id = $1`
+      params.push(ugelId)
+    }
 
-  const { data, error } = await query.order("name", { ascending: true })
+    sql += ` ORDER BY name ASC`
 
-  if (error) {
-    console.error("Error cargando colegios:", error)
-    return NextResponse.json({ error: "No se pudieron cargar los colegios" }, { status: 500 })
+    const result = await dbQuery(sql, params)
+
+    return NextResponse.json(result.rows)
+  } catch (error) {
+    console.error("❌ Error cargando colegios:", error)
+    return NextResponse.json(
+      { error: "No se pudieron cargar los colegios" },
+      { status: 500 }
+    )
   }
-
-  return NextResponse.json(data)
 }

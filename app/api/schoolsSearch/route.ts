@@ -1,30 +1,33 @@
 // app/api/schoolsSearch/route.ts
 import { NextResponse } from "next/server"
-import { supabase } from "@/lib/supabaseClient"
+import { dbQuery } from "@/app/config/connection"
 
 export async function GET(req: Request) {
-  const { searchParams } = new URL(req.url)
-  const ugelId = searchParams.get("ugelId")
-  const query = searchParams.get("query")
-
-  if (!ugelId || !query) {
-    return NextResponse.json([])
-  }
-
   try {
-    // Buscar colegios de la UGEL cuyo nombre contenga el texto buscado
-    const { data, error } = await supabase
-      .from("school_new")
-      .select("id, name, nivel_educativo")
-      .eq("ugel_id", Number(ugelId))
-      .ilike("name", `%${query}%`)
-      .order("name", { ascending: true })
-      .limit(20) // límite para autocompletado
+    const { searchParams } = new URL(req.url)
+    const ugelId = searchParams.get("ugelId")
+    const query = searchParams.get("query")
 
-    if (error) throw error
-    return NextResponse.json(data || [])
-  } catch (err) {
-    console.error("Error en /api/schoolsSearch:", err)
+    if (!ugelId || !query) {
+      return NextResponse.json([])
+    }
+
+    const sql = `
+      SELECT id, name, nivel_educativo
+      FROM minedu.school_new
+      WHERE ugel_id = $1
+        AND name ILIKE $2
+      ORDER BY name ASC
+      LIMIT 20
+    `
+
+    const params = [Number(ugelId), `%${query}%`]
+
+    const result = await dbQuery(sql, params)
+
+    return NextResponse.json(result.rows)
+  } catch (error) {
+    console.error("❌ Error en /api/schoolsSearch:", error)
     return NextResponse.json([], { status: 500 })
   }
 }

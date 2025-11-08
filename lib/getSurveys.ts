@@ -1,4 +1,5 @@
-import { supabase } from "@/lib/supabaseClient"
+// app/lib/dbSurveys.ts
+import { dbQuery } from "@/app/config/connection"
 
 export interface Survey {
   id: number
@@ -11,15 +12,18 @@ export interface Survey {
 }
 
 export async function getSurveys(): Promise<Survey[]> {
-  const { data, error } = await supabase
-    .from("surveys")
-    .select("id, title, description, unique_link_slug, starts_at, ends_at, is_active")
-    .order("id", { ascending: true })
+  try {
+    const res = await dbQuery(
+      `
+      SELECT id, title, description, unique_link_slug, starts_at, ends_at, is_active
+      FROM minedu.surveys
+      ORDER BY id ASC
+      `
+    )
 
-  if (error) {
-    console.error("Error al obtener encuestas:", error)
+    return res.rows
+  } catch (err) {
+    console.error("Error al obtener encuestas:", err)
     return []
   }
-
-  return data || []
 }

@@ -70,7 +70,6 @@ useEffect(() => {
           { href: "/dashboard", label: "Dashboard" },
           { href: "/dashboard/reportes", label: "Reportes" },
           { href: "/dashboard/tabla-progreso", label: "Progreso" },
-          { href: "/dashboard/importar", label: "Importar Colegios" },
         ]
       : []
 

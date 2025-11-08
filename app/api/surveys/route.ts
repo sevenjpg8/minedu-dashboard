@@ -1,16 +1,29 @@
+// app/api/surveys/route.ts
 import { NextResponse } from "next/server"
-import { supabase } from "@/lib/supabaseClient"
+import { dbQuery } from "@/app/config/connection"
 
 export async function GET() {
-  const { data, error } = await supabase
-    .from("surveys")
-    .select("id, title, description, starts_at, ends_at, is_active")
-    .order("id", { ascending: true })
+  try {
+    const result = await dbQuery(
+      `
+      SELECT 
+        id,
+        title,
+        description,
+        starts_at,
+        ends_at,
+        is_active
+      FROM minedu.surveys
+      ORDER BY id ASC
+      `
+    )
 
-  if (error) {
-    console.error("Error cargando encuestas:", error)
-    return NextResponse.json({ error: "No se pudieron cargar las encuestas" }, { status: 500 })
+    return NextResponse.json(result.rows)
+  } catch (error) {
+    console.error("❌ Error cargando encuestas:", error)
+    return NextResponse.json(
+      { error: "No se pudieron cargar las encuestas" },
+      { status: 500 }
+    )
   }
-
-  return NextResponse.json(data)
 }

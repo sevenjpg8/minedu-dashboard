@@ -1,196 +1,143 @@
 // app/api/reportes/route.ts
-import { NextResponse } from "next/server"
-import { supabase } from "@/lib/supabaseClient"
-
-interface AnswerRow {
-  id: number
-  question: { text: string } | null
-  option: { text: string } | null
-  survey_participation: {
-    survey_id: number
-    school_id: number
-    education_level: string
-    grade: string
-  }
-}
+import { NextResponse } from "next/server";
+import { dbQuery } from "@/app/config/connection";
 
 export async function GET(req: Request) {
   try {
-    const { searchParams } = new URL(req.url)
-    const surveyId = searchParams.get("encuesta")
-    const dreId = searchParams.get("dre")
-    const ugelId = searchParams.get("ugel")
-    const schoolId = searchParams.get("colegio")
-    const nivelEducativo = searchParams.get("nivelEducativo")
-    const grado = searchParams.get("grado")
+    const { searchParams } = new URL(req.url);
+    const surveyId = searchParams.get("encuesta");
+    const dreId = searchParams.get("dre");
+    const ugelId = searchParams.get("ugel");
+    const schoolId = searchParams.get("colegio");
+    const nivelEducativo = searchParams.get("nivelEducativo");
+    const grado = searchParams.get("grado");
 
     if (!surveyId) {
-      return NextResponse.json({ success: false, message: "Falta encuesta" }, { status: 400 })
+      return NextResponse.json(
+        { success: false, message: "Falta encuesta" },
+        { status: 400 }
+      );
     }
 
-    // 1️⃣ Obtener participaciones de la encuesta
-    const { data: participations, error: pError } = await supabase
-      .from("survey_participations")
-      .select("id, survey_id, school_id, education_level, grade")
-      .eq("survey_id", surveyId)
+    // ✅ 1. Obtener participaciones de la encuesta
+    const participationsQuery = `
+      SELECT id, survey_id, school_id, education_level, grade
+      FROM minedu.survey_participations
+      WHERE survey_id = $1
+    `;
+    const participationsRes = await dbQuery(participationsQuery, [surveyId]);
+    let participations = participationsRes.rows;
 
-    if (pError) throw pError
-    if (!participations || participations.length === 0)
-      return NextResponse.json({ success: true, charts: [] })
+    if (participations.length === 0) {
+      return NextResponse.json({ success: true, charts: [] });
+    }
 
-    // 2️⃣ Filtrar participaciones según los parámetros
-    let filteredParticipations = [...participations]
-    //console.log("🎯 Parámetros recibidos:", { surveyId, dreId, ugelId, schoolId, nivelEducativo, grado })
-    console.log("📊 Participaciones totales:", participations.length)
+    let filtered = participations;
 
+    // ✅ FILTROS
+
+    // ✅ Filtro por DRE → obtener UGELs → obtener colegios → filtrar participaciones
     if (dreId) {
-      // 1️⃣ Obtener todas las UGELs de la DRE
-      const { data: ugels, error: ugelError } = await supabase
-        .from("ugel_new")
-        .select("id")
-        .eq("dre_id", Number(dreId));
+      const ugelsRes = await dbQuery(
+        "SELECT id FROM minedu.ugel_new WHERE dre_id = $1",
+        [dreId]
+      );
+      const ugelIds = ugelsRes.rows.map(r => r.id);
 
-      if (ugelError) throw ugelError;
-      const ugelIds = ugels?.map((u) => Number(u.id)) || [];
-      console.log("📋 UGEL IDs encontrados para DRE", dreId, ":", ugelIds);
+      if (ugelIds.length > 0) {
+        const schoolsRes = await dbQuery(
+          "SELECT id FROM minedu.school_new WHERE ugel_id = ANY($1)",
+          [ugelIds]
+        );
+        const schoolsIds = schoolsRes.rows.map(r => r.id);
 
-      if (ugelIds.length === 0) {
-        console.log("⚠️ Ninguna UGEL encontrada para DRE", dreId);
+        filtered = filtered.filter(p => schoolsIds.includes(p.school_id));
       }
+    }
 
-      // 2️⃣ Obtener TODOS los colegios asociados a esas UGELs usando paginación
-      let allSchools: any[] = [];
-      let from = 0;
-      const pageSize = 1000;
-      let hasMore = true;
-
-      while (hasMore) {
-        const { data, error } = await supabase
-          .from("school_new")
-          .select("id, ugel_id")
-          .in("ugel_id", ugelIds)
-          .range(from, from + pageSize - 1);
-
-        if (error) throw error;
-        if (!data || data.length === 0) break;
-
-        allSchools.push(...data);
-        hasMore = data.length === pageSize;
-        from += pageSize;
-      }
-
-      const schoolsDreIds = allSchools.map((s) => Number(s.id));
-      console.log("🏫 Total colegios encontrados (paginado):", schoolsDreIds.length);
-      console.log("🧩 Incluye el colegio 45352?", schoolsDreIds.includes(45352));
-
-      // 3️⃣ Filtrar participaciones según los colegios de la DRE
-      filteredParticipations = filteredParticipations.filter((p) =>
-        schoolsDreIds.includes(Number(p.school_id))
+    // ✅ Filtro por UGEL
+    if (ugelId) {
+      const schoolsRes = await dbQuery(
+        "SELECT id FROM minedu.school_new WHERE ugel_id = $1",
+        [ugelId]
       );
 
-      console.log("🎯 Participaciones luego del filtro DRE:", filteredParticipations.length);
+      const schoolIds = schoolsRes.rows.map(r => r.id);
+      filtered = filtered.filter(p => schoolIds.includes(p.school_id));
     }
 
-    
-    if (ugelId) {
-      const { data: schoolsUgel, error: ugelError } = await supabase
-        .from("school_new")
-        .select("id, ugel_id")
-        .eq("ugel_id", ugelId)
-
-      if (ugelError) throw ugelError
-
-      const schoolsUgelIds = schoolsUgel?.map((s) => s.id) || []
-      filteredParticipations = filteredParticipations.filter((p) =>
-        schoolsUgelIds.includes(Number(p.school_id))
-      )
-
-      console.log("UGEL seleccionada:", ugelId)
-      //console.log("Colegios UGEL:", schoolsUgelIds)
-      console.log("Participaciones luego de UGEL:", filteredParticipations.length)
-    }
-
+    // ✅ Filtro por Colegio
     if (schoolId) {
-      console.log("Colegio seleccionado:", schoolId)
-      filteredParticipations = filteredParticipations.filter(
-        (p) => String(p.school_id).trim() === String(schoolId).trim()
-      )
-      console.log("Participaciones luego de colegio:", filteredParticipations.length)
+      filtered = filtered.filter(
+        p => String(p.school_id) === String(schoolId)
+      );
     }
 
-    if (nivelEducativo)
-      filteredParticipations = filteredParticipations.filter(
-        (p) => p.education_level.toLowerCase() === nivelEducativo.toLowerCase()
-      )
-
-
-    if (grado)
-      filteredParticipations = filteredParticipations.filter(
-        (p) => p.grade === grado
-      )
-
-      if (schoolId) {
-      console.log("Colegio seleccionado:", schoolId)
-      console.log("Participaciones luego de colegio:", filteredParticipations.length)
+    // ✅ Filtro por Nivel educativo
+    if (nivelEducativo) {
+      filtered = filtered.filter(
+        p => p.education_level.toLowerCase() === nivelEducativo.toLowerCase()
+      );
     }
 
-    if (nivelEducativo || grado) {
-      console.log("Nivel:", nivelEducativo, "Grado:", grado)
-      console.log("Participaciones luego de nivel/grado:", filteredParticipations.length)
+    // ✅ Filtro por Grado
+    if (grado) {
+      filtered = filtered.filter(p => p.grade === grado);
     }
 
-
-    // Si no quedan participaciones, no hay datos
-    if (filteredParticipations.length === 0)
-      return NextResponse.json({ success: true, charts: [] })
-
-    // 3️⃣ Obtener respuestas de las participaciones filtradas
-    const filteredIds = filteredParticipations.map((p) => p.id)
-
-    const { data, error } = await supabase
-      .from("answers")
-      .select(`
-        id,
-        question:question_id(text),
-        option:option_id(text)
-      `)
-      .in("survey_participation_id", filteredIds)
-      .returns<AnswerRow[]>()
-
-    if (error) throw error
-    if (!data || data.length === 0)
-      return NextResponse.json({ success: true, charts: [] })
-
-    // 4️⃣ Agrupar por pregunta y opción
-    const agrupado: Record<string, Record<string, number>> = {}
-
-    for (const row of data) {
-      const pregunta = row.question?.text || "Sin pregunta"
-      const opcion = row.option?.text || "Sin opción"
-
-      if (!agrupado[pregunta]) agrupado[pregunta] = {}
-      if (!agrupado[pregunta][opcion]) agrupado[pregunta][opcion] = 0
-
-      agrupado[pregunta][opcion]++
+    if (filtered.length === 0) {
+      return NextResponse.json({ success: true, charts: [] });
     }
 
-    // 5️⃣ Convertir en formato para Recharts
-    const charts = Object.entries(agrupado).map(([pregunta, opciones]) => ({
+    // ✅ 3. Obtener respuestas de las participaciones filtradas
+    const participationIds = filtered.map(p => p.id);
+
+    const answersQuery = `
+      SELECT 
+        a.id,
+        q.text AS question_text,
+        o.text AS option_text
+      FROM minedu.answers a
+      LEFT JOIN minedu.questions q ON q.id = a.question_id
+      LEFT JOIN minedu.options o ON o.id = a.option_id
+      WHERE a.survey_participation_id = ANY($1)
+    `;
+
+    const answersRes = await dbQuery(answersQuery, [participationIds]);
+    const answers = answersRes.rows;
+
+    if (answers.length === 0) {
+      return NextResponse.json({ success: true, charts: [] });
+    }
+
+    // ✅ 4. Agrupar por pregunta y opción
+    const grouped: Record<string, Record<string, number>> = {};
+
+    for (const row of answers) {
+      const pregunta = row.question_text || "Sin pregunta";
+      const opcion = row.option_text || "Sin opción";
+
+      if (!grouped[pregunta]) grouped[pregunta] = {};
+      if (!grouped[pregunta][opcion]) grouped[pregunta][opcion] = 0;
+
+      grouped[pregunta][opcion]++;
+    }
+
+    // ✅ 5. Convertir formato para Recharts
+    const charts = Object.entries(grouped).map(([pregunta, opciones]) => ({
       question: pregunta,
       data: Object.entries(opciones).map(([name, count]) => ({
         name,
         "# de Respuestas": count,
       })),
-    }))
+    }));
 
-    return NextResponse.json({ success: true, charts })
+    return NextResponse.json({ success: true, charts });
   } catch (err) {
-    console.error("Error en /api/reportes:", err)
+    console.error("❌ Error en /api/reportes:", err);
     return NextResponse.json(
       { success: false, message: "Error interno del servidor" },
       { status: 500 }
-    )
-    
+    );
   }
-  
 }
