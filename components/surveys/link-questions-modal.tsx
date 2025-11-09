@@ -57,7 +57,6 @@ export function LinkQuestionsModal({
                     className="w-4 h-4 mt-1 text-blue-600 border-gray-300 rounded focus:ring-2 focus:ring-blue-500"
                   />
                   <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium text-gray-800">Pregunta {idx + 1}</p>
                     <p className="text-sm text-gray-600 break-words">{q.text}</p>
                   </div>
                 </label>

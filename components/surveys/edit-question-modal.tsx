@@ -28,7 +28,7 @@ export function EditQuestionModal({
   if (!isOpen) return null
 
   return (
-    <div className="fixed inset-0 bg-[rgba(0,0,0,0.50)] flex items-center justify-end z-[70] p-4">
+    <div className="fixed inset-0 bg-[rgba(0,0,0,0.50)] flex items-center justify-center z-[70] p-4">
       <div className="bg-white rounded-lg shadow-lg w-full max-w-md max-h-[90vh] overflow-y-auto slide-in-from-right">
         <div className="flex items-center justify-between p-6 border-b border-gray-200 sticky top-0 bg-white">
           <div className="flex items-center gap-2">

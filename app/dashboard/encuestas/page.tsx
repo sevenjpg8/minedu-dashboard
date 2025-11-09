@@ -585,7 +585,7 @@ export default function EncuestasPage() {
 
       <LinkQuestionsModal
         isOpen={showLinkQuestionsModal}
-        questions={questions}
+        questions={questions.filter(q => q.id !== selectedQuestionId)}
         selectedNextQuestion={selectedNextQuestion}
         onToggleNextQuestion={toggleNextQuestion}
         onSave={handleSaveLinkQuestions}
