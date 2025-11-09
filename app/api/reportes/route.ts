@@ -2,6 +2,14 @@
 import { NextResponse } from "next/server";
 import { dbQuery } from "@/app/config/connection";
 
+interface AnswerRow {
+  id: string;
+  survey_participation_id: string;
+  question_id: number | null;
+  question_text: string | null;
+  option_text: string | null;
+}
+
 export async function GET(req: Request) {
   try {
     const { searchParams } = new URL(req.url);
@@ -19,124 +27,141 @@ export async function GET(req: Request) {
       );
     }
 
-    // ✅ 1. Obtener participaciones de la encuesta
-    const participationsQuery = `
-      SELECT id, survey_id, school_id, education_level, grade
-      FROM minedu.survey_participations
-      WHERE survey_id = $1
-    `;
-    const participationsRes = await dbQuery(participationsQuery, [surveyId]);
-    let participations = participationsRes.rows;
+    // 1️⃣ Obtener participaciones
+    const participationsRes = await dbQuery(
+      `SELECT id, survey_id, school_id, education_level, grade
+       FROM minedu.survey_participations
+       WHERE survey_id = $1`,
+      [surveyId]
+    );
+    const participations = participationsRes.rows;
 
-    if (participations.length === 0) {
+    if (!participations || participations.length === 0) {
       return NextResponse.json({ success: true, charts: [] });
     }
 
-    let filtered = participations;
+    let filteredParticipations = [...participations];
+    console.log("📊 Participaciones totales:", participations.length);
 
-    // ✅ FILTROS
-
-    // ✅ Filtro por DRE → obtener UGELs → obtener colegios → filtrar participaciones
+    // 2️⃣ Filtro por DRE
     if (dreId) {
       const ugelsRes = await dbQuery(
-        "SELECT id FROM minedu.ugel_new WHERE dre_id = $1",
+        `SELECT id FROM minedu.ugel_new WHERE dre_id = $1`,
         [dreId]
       );
-      const ugelIds = ugelsRes.rows.map(r => r.id);
+      const ugelIds = ugelsRes.rows.map((u) => Number(u.id));
+      console.log("📋 UGEL IDs encontrados:", ugelIds);
 
       if (ugelIds.length > 0) {
         const schoolsRes = await dbQuery(
-          "SELECT id FROM minedu.school_new WHERE ugel_id = ANY($1)",
+          `SELECT id FROM minedu.school_new WHERE ugel_id = ANY($1::int[])`,
           [ugelIds]
         );
-        const schoolsIds = schoolsRes.rows.map(r => r.id);
+        const schoolIds = schoolsRes.rows.map((s) => Number(s.id));
+        console.log("🏫 Total colegios encontrados:", schoolIds.length);
 
-        filtered = filtered.filter(p => schoolsIds.includes(p.school_id));
+        filteredParticipations = filteredParticipations.filter((p) =>
+          schoolIds.includes(Number(p.school_id))
+        );
+        console.log("🎯 Participaciones luego del filtro DRE:", filteredParticipations.length);
+      } else {
+        filteredParticipations = [];
       }
     }
 
-    // ✅ Filtro por UGEL
+    // 3️⃣ Filtro por UGEL
     if (ugelId) {
-      const schoolsRes = await dbQuery(
-        "SELECT id FROM minedu.school_new WHERE ugel_id = $1",
+      const schoolsUgelRes = await dbQuery(
+        `SELECT id FROM minedu.school_new WHERE ugel_id = $1`,
         [ugelId]
       );
-
-      const schoolIds = schoolsRes.rows.map(r => r.id);
-      filtered = filtered.filter(p => schoolIds.includes(p.school_id));
+      const schoolsUgelIds = schoolsUgelRes.rows.map((s) => Number(s.id));
+      filteredParticipations = filteredParticipations.filter((p) =>
+        schoolsUgelIds.includes(Number(p.school_id))
+      );
+      console.log("Participaciones luego de UGEL:", filteredParticipations.length);
     }
 
-    // ✅ Filtro por Colegio
+    // 4️⃣ Filtro por colegio
     if (schoolId) {
-      filtered = filtered.filter(
-        p => String(p.school_id) === String(schoolId)
+      filteredParticipations = filteredParticipations.filter(
+        (p) => String(p.school_id).trim() === String(schoolId).trim()
       );
+      console.log("Participaciones luego de colegio:", filteredParticipations.length);
     }
 
-    // ✅ Filtro por Nivel educativo
+    // 5️⃣ Filtros adicionales
     if (nivelEducativo) {
-      filtered = filtered.filter(
-        p => p.education_level.toLowerCase() === nivelEducativo.toLowerCase()
+      filteredParticipations = filteredParticipations.filter(
+        (p) => p.education_level?.toLowerCase() === nivelEducativo.toLowerCase()
+      );
+    }
+    if (grado) {
+      filteredParticipations = filteredParticipations.filter(
+        (p) => p.grade === grado
       );
     }
 
-    // ✅ Filtro por Grado
-    if (grado) {
-      filtered = filtered.filter(p => p.grade === grado);
-    }
-
-    if (filtered.length === 0) {
+    if (filteredParticipations.length === 0) {
       return NextResponse.json({ success: true, charts: [] });
     }
 
-    // ✅ 3. Obtener respuestas de las participaciones filtradas
-    const participationIds = filtered.map(p => p.id);
+    // 6️⃣ Obtener respuestas (UUID fix)
+    const participationIds = filteredParticipations.map((p) => String(p.id));
 
-    const answersQuery = `
-      SELECT 
+    const answersRes = await dbQuery(
+      `
+      SELECT
         a.id,
+        a.survey_participation_id,
+        a.question_id,
         q.text AS question_text,
         o.text AS option_text
       FROM minedu.answers a
       LEFT JOIN minedu.questions q ON q.id = a.question_id
       LEFT JOIN minedu.options o ON o.id = a.option_id
-      WHERE a.survey_participation_id = ANY($1)
-    `;
+      WHERE a.survey_participation_id = ANY($1::uuid[])
+      `,
+      [participationIds]
+    );
 
-    const answersRes = await dbQuery(answersQuery, [participationIds]);
-    const answers = answersRes.rows;
+    const data: AnswerRow[] = answersRes.rows;
 
-    if (answers.length === 0) {
+    if (!data || data.length === 0) {
       return NextResponse.json({ success: true, charts: [] });
     }
 
-    // ✅ 4. Agrupar por pregunta y opción
-    const grouped: Record<string, Record<string, number>> = {};
+    // 7️⃣ Agrupar por pregunta y opción
+    const agrupado: Record<string, Record<string, number>> = {};
 
-    for (const row of answers) {
+    for (const row of data) {
       const pregunta = row.question_text || "Sin pregunta";
       const opcion = row.option_text || "Sin opción";
 
-      if (!grouped[pregunta]) grouped[pregunta] = {};
-      if (!grouped[pregunta][opcion]) grouped[pregunta][opcion] = 0;
+      if (!agrupado[pregunta]) agrupado[pregunta] = {};
+      if (!agrupado[pregunta][opcion]) agrupado[pregunta][opcion] = 0;
 
-      grouped[pregunta][opcion]++;
+      agrupado[pregunta][opcion]++;
     }
 
-    // ✅ 5. Convertir formato para Recharts
-    const charts = Object.entries(grouped).map(([pregunta, opciones]) => ({
-      question: pregunta,
-      data: Object.entries(opciones).map(([name, count]) => ({
-        name,
-        "# de Respuestas": count,
-      })),
-    }));
+    // 8️⃣ Formato para Recharts
+    const charts = Object.entries(agrupado).map(([pregunta, opciones]) => {
+      const firstRow = data.find((r) => r.question_text === pregunta);
+      return {
+        id: firstRow?.question_id ?? 0,
+        question: pregunta,
+        data: Object.entries(opciones).map(([name, count]) => ({
+          name,
+          "# de Respuestas": count,
+        })),
+      };
+    });
 
     return NextResponse.json({ success: true, charts });
   } catch (err) {
-    console.error("❌ Error en /api/reportes:", err);
+    console.error("Error en /api/reportes:", err);
     return NextResponse.json(
-      { success: false, message: "Error interno del servidor" },
+      { success: false, message: "Error interno del servidor", detail: String(err) },
       { status: 500 }
     );
   }
