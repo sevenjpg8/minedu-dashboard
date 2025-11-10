@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { dbQuery } from "@/app/config/connection"; // tu helper de conexión
+import { dbQuery } from "@/app/config/connection";
 
 export async function GET() {
   try {

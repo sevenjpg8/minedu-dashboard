@@ -8,7 +8,7 @@ export async function GET(req: Request) {
     const limit = Number(searchParams.get("limit") || 10)
     const offset = (page - 1) * limit
 
-    // 🔹 Consulta: traer incidencias ordenadas por últimos envíos
+    // Consulta: traer incidencias ordenadas por últimos envíos
     const query = `
       SELECT id, description, created_at, updated_at
       FROM minedu.incidencias
@@ -17,7 +17,7 @@ export async function GET(req: Request) {
     `
     const result = await dbQuery(query, [limit, offset])
 
-    // 🔹 Total de incidencias
+    // Total de incidencias
     const countResult = await dbQuery(`SELECT COUNT(*) FROM minedu.incidencias`)
     const total = Number(countResult.rows[0].count)
 

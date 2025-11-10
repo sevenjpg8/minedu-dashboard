@@ -3,7 +3,6 @@ import { dbQuery } from "@/app/config/connection";
 
 export async function GET() {
   try {
-    // ✅ Traer preguntas + opciones en una sola consulta
     const sql = `
       SELECT 
         q.id AS question_id,
@@ -21,7 +20,6 @@ export async function GET() {
 
     const rows = result.rows;
 
-    // ✅ Agrupar preguntas + opciones
     const grouped: any = {};
 
     for (const row of rows) {

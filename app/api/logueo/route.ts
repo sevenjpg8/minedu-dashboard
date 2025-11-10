@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { dbQuery } from "@/app/config/connection"; // ✅ tu conexión a PostgreSQL
+import { dbQuery } from "@/app/config/connection";
 
 export async function POST(req: Request) {
   try {
@@ -12,7 +12,6 @@ export async function POST(req: Request) {
       );
     }
 
-    // ✅ Buscar el usuario en el schema minedu
     const sql = `
       SELECT id, password, rol_id
       FROM minedu.usuarios
@@ -31,7 +30,6 @@ export async function POST(req: Request) {
       );
     }
 
-    // ✅ Comparación simple (la misma que usabas)
     if (password !== user.password) {
       return NextResponse.json(
         { message: "Contraseña incorrecta" },
@@ -39,7 +37,6 @@ export async function POST(req: Request) {
       );
     }
 
-    // ✅ Generar token con id + rol_id
     const payload = {
       id: user.id,
       rol_id: user.rol_id,
@@ -47,7 +44,6 @@ export async function POST(req: Request) {
 
     const encoded = Buffer.from(JSON.stringify(payload)).toString("base64");
 
-    // ✅ Configurar cookie
     const response = NextResponse.json({ message: "Login exitoso" });
 
     response.cookies.set("auth_token", encoded, {

@@ -24,7 +24,6 @@ export async function GET() {
       FROM colegios;
     `;
 
-    // ✅ Aquí solo llamas la función directamente
     const { rows } = await dbQuery(query);
     const row = rows[0];
 
