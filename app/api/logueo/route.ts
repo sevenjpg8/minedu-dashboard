@@ -3,77 +3,67 @@ import { dbQuery } from "@/app/config/connection";
 
 export async function POST(req: Request) {
   try {
-    console.log("🔹 [LOGIN] Petición recibida");
-
     const { email, password } = await req.json();
-    console.log("📩 Datos recibidos:", { email, password });
 
-    if (!email || !password) {
-      console.warn("⚠️ Faltan credenciales");
+    // 1️⃣ Validar campos
+    if (!email?.trim() || !password?.trim()) {
       return NextResponse.json(
-        { message: "Faltan credenciales" },
+        { error: "Por favor, completa todos los campos" },
         { status: 400 }
       );
     }
 
-    const sql = `
+    // 2️⃣ Buscar usuario
+    const query = `
       SELECT id, password, rol_id
       FROM minedu.usuarios
       WHERE email = $1
-      LIMIT 1
+      LIMIT 1;
     `;
-
-    console.log("🔍 Ejecutando consulta SQL:", sql, "con parámetros:", [email]);
-    const result = await dbQuery(sql, [email]);
-
-    console.log("📊 Resultado de la consulta:", result.rows);
-
+    const result = await dbQuery(query, [email]);
     const user = result.rows[0];
 
     if (!user) {
-      console.warn("❌ Usuario no encontrado para el email:", email);
       return NextResponse.json(
-        { message: "Usuario no encontrado" },
-        { status: 401 }
+        { error: "Usuario no encontrado" },
+        { status: 404 }
       );
     }
 
-    console.log("👤 Usuario encontrado:", user);
-
+    // 3️⃣ Validar contraseña
     if (password !== user.password) {
-      console.warn("🚫 Contraseña incorrecta para:", email);
       return NextResponse.json(
-        { message: "Contraseña incorrecta" },
+        { error: "Contraseña incorrecta" },
         { status: 401 }
       );
     }
 
+    // 4️⃣ Crear token
     const payload = {
       id: user.id,
       rol_id: user.rol_id,
     };
+    const token = Buffer.from(JSON.stringify(payload)).toString("base64");
 
-    console.log("🧩 Payload para token:", payload);
+    // 5️⃣ Configurar cookie
+    const response = NextResponse.json({
+      success: true,
+      message: "Login exitoso",
+      user: payload,
+    });
 
-    const encoded = Buffer.from(JSON.stringify(payload)).toString("base64");
-    console.log("🔑 Token codificado:", encoded);
-
-    const response = NextResponse.json({ message: "Login exitoso" });
-
-    response.cookies.set("auth_token", encoded, {
+    response.cookies.set("auth_token", token, {
       httpOnly: true,
       secure: process.env.NODE_ENV === "production",
       path: "/",
       maxAge: 60 * 60 * 24, // 1 día
     });
 
-    console.log("🍪 Cookie configurada correctamente");
-
     return response;
   } catch (err) {
-    console.error("💥 Error en login:", err);
+    console.error("Error en /api/logueo:", err);
     return NextResponse.json(
-      { message: "Error en el servidor" },
+      { error: "Error interno del servidor" },
       { status: 500 }
     );
   }
