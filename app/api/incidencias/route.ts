@@ -8,7 +8,7 @@ export async function GET(req: Request) {
     const limit = Number(searchParams.get("limit") || 10)
     const offset = (page - 1) * limit
 
-    // Consulta: traer incidencias ordenadas por últimos envíos
+    // Consulta traer incidencias ordenadas por últimos envíos
     const query = `
       SELECT id, description, created_at, updated_at
       FROM minedu.incidencias
