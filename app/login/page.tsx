@@ -22,10 +22,10 @@ export default function LoginPage() {
     setIsLoading(true)
     setError(null)
 
-    // //console.log("📨 Enviando formulario de login")
-    // //console.log("➡️ Email:", email)
-    // //console.log("➡️ Password:", password)
-    // console.log("➡️ Remember me:", rememberMe)
+    console.log("📨 Enviando formulario de login")
+    console.log("➡️ Email:", email)
+    console.log("➡️ Password:", password)
+    console.log("➡️ Remember me:", rememberMe)
 
     try {
       const res = await fetch("/api/logueo", {
@@ -34,21 +34,21 @@ export default function LoginPage() {
         body: JSON.stringify({ email, password }),
       })
 
-      // console.log("📥 Respuesta recibida del servidor:", res)
+      console.log("📥 Respuesta recibida del servidor:", res)
 
       if (res.ok) {
-        // console.log("✅ Login exitoso. Redirigiendo a /dashboard")
+        console.log("✅ Login exitoso. Redirigiendo a /dashboard")
         router.push("/dashboard")
       } else {
         const data = await res.json()
-        // console.warn("⚠️ Error en login:", data)
+        console.warn("⚠️ Error en login:", data)
         setError(data.message || "Error al iniciar sesión")
       }
     } catch (error) {
-      // console.error("💥 Error de conexión o en el servidor:", error)
+      console.error("💥 Error de conexión o en el servidor:", error)
       setError("Error del servidor")
     } finally {
-      // console.log("⏳ Finalizando proceso de login")
+      console.log("⏳ Finalizando proceso de login")
       setIsLoading(false)
     }
   }
@@ -89,7 +89,7 @@ export default function LoginPage() {
                 placeholder="Ingrese su correo"
                 value={email}
                 onChange={(e) => {
-                  // console.log("✏️ Escribiendo email:", e.target.value)
+                  console.log("✏️ Escribiendo email:", e.target.value)
                   setEmail(e.target.value)
                 }}
                 required
@@ -108,7 +108,7 @@ export default function LoginPage() {
                 placeholder="Ingrese su contraseña"
                 value={password}
                 onChange={(e) => {
-                  // console.log("🔐 Escribiendo contraseña:", e.target.value)
+                  console.log("🔐 Escribiendo contraseña:", e.target.value)
                   setPassword(e.target.value)
                 }}
                 required
@@ -122,7 +122,7 @@ export default function LoginPage() {
                 id="remember"
                 checked={rememberMe}
                 onCheckedChange={(checked) => {
-                  // console.log("💾 Cambiado Remember me:", checked)
+                  console.log("💾 Cambiado Remember me:", checked)
                   setRememberMe(checked as boolean)
                 }}
               />
