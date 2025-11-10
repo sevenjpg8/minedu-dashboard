@@ -7,7 +7,7 @@ export async function POST() {
   // Eliminar cookie (colocando maxAge=0)
   response.cookies.set("auth_token", "", {
     httpOnly: true,
-    secure: process.env.NODE_ENV === "production",
+    secure: false, // Cambiar a true en producción
     path: "/",
     maxAge: 0, // expira inmediatamente
   })
