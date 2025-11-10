@@ -40,6 +40,9 @@ const totalPages = Math.ceil(totalIncidents / limit)
   const lightBg = "#f8f9fa"
   const borderGray = "#e5e7eb"
 
+
+    
+
   useEffect(() => {
   const fetchData = async () => {
   try {

@@ -7,6 +7,7 @@ import { Input } from "@/components/ui/input"
 import { Checkbox } from "@/components/ui/checkbox"
 import { ErrorAlert } from "@/components/ui/error-alert"
 import Link from "next/link"
+import { useRouter } from "next/navigation";
 
 export default function LoginPage() {
   const [email, setEmail] = useState("")
@@ -14,6 +15,7 @@ export default function LoginPage() {
   const [rememberMe, setRememberMe] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const router = useRouter();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -36,7 +38,7 @@ export default function LoginPage() {
 
       if (res.ok) {
         console.log("✅ Login exitoso. Redirigiendo a /dashboard")
-        window.location.href = "/dashboard"
+        router.push("/dashboard")
       } else {
         const data = await res.json()
         console.warn("⚠️ Error en login:", data)
