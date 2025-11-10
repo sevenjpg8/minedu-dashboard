@@ -16,7 +16,6 @@ export async function GET(
       )
     }
 
-    // ✅ 1. Obtener la encuesta base
     const surveyResult = await dbQuery(
       `SELECT * FROM minedu.surveys WHERE id = $1`,
       [surveyId]
@@ -31,7 +30,6 @@ export async function GET(
 
     const survey = surveyResult.rows[0]
 
-    // ✅ 2. Obtener todas las preguntas de la encuesta
     const questionsResult = await dbQuery(
       `
       SELECT id, prefix, text
@@ -44,7 +42,6 @@ export async function GET(
 
     const questions = questionsResult.rows
 
-    // ✅ 3. Obtener todas las opciones relacionadas (con el next_question_id incluido)
     const questionIds = questions.map(q => q.id)
     let options: any[] = []
 
@@ -61,7 +58,6 @@ export async function GET(
       options = optionsResult.rows
     }
 
-    // ✅ 4. Combinar preguntas + opciones, y normalizar next_question_id
     const questionsWithOptions = questions.map(q => ({
       ...q,
       options: options
@@ -73,7 +69,6 @@ export async function GET(
         }))
     }))
 
-    // ✅ 5. Respuesta final completa
     return NextResponse.json({
       ...survey,
       questions: questionsWithOptions

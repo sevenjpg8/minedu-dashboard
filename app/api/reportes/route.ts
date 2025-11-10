@@ -27,7 +27,7 @@ export async function GET(req: Request) {
       );
     }
 
-    // 1️⃣ Obtener participaciones
+    // Obtener participaciones
     const participationsRes = await dbQuery(
       `SELECT id, survey_id, school_id, education_level, grade
        FROM minedu.survey_participations
@@ -63,7 +63,7 @@ export async function GET(req: Request) {
         filteredParticipations = filteredParticipations.filter((p) =>
           schoolIds.includes(Number(p.school_id))
         );
-        console.log("🎯 Participaciones luego del filtro DRE:", filteredParticipations.length);
+        //console.log("🎯Participaciones luego del filtro DRE:", filteredParticipations.length);
       } else {
         filteredParticipations = [];
       }
@@ -82,7 +82,6 @@ export async function GET(req: Request) {
       console.log("Participaciones luego de UGEL:", filteredParticipations.length);
     }
 
-    // 4️⃣ Filtro por colegio
     if (schoolId) {
       filteredParticipations = filteredParticipations.filter(
         (p) => String(p.school_id).trim() === String(schoolId).trim()
@@ -90,7 +89,6 @@ export async function GET(req: Request) {
       console.log("Participaciones luego de colegio:", filteredParticipations.length);
     }
 
-    // 5️⃣ Filtros adicionales
     if (nivelEducativo) {
       filteredParticipations = filteredParticipations.filter(
         (p) => p.education_level?.toLowerCase() === nivelEducativo.toLowerCase()
@@ -106,7 +104,6 @@ export async function GET(req: Request) {
       return NextResponse.json({ success: true, charts: [] });
     }
 
-    // 6️⃣ Obtener respuestas (UUID fix)
     const participationIds = filteredParticipations.map((p) => String(p.id));
 
     const answersRes = await dbQuery(
@@ -144,7 +141,6 @@ export async function GET(req: Request) {
       agrupado[pregunta][opcion]++;
     }
 
-    // 8️⃣ Formato para Recharts
     const charts = Object.entries(agrupado).map(([pregunta, opciones]) => {
       const firstRow = data.find((r) => r.question_text === pregunta);
       return {

@@ -20,7 +20,6 @@ export async function DELETE(req: Request) {
     )
     const questionIds = questionsResult.rows.map((q: any) => q.id)
 
-    // 2️⃣ Eliminar respuestas relacionadas
     if (questionIds.length > 0) {
       const deleteAnswersQuery = `
         DELETE FROM minedu.answers
@@ -28,14 +27,12 @@ export async function DELETE(req: Request) {
       `
       await dbQuery(deleteAnswersQuery, [questionIds])
 
-      // 3️⃣ Eliminar opciones
       const deleteOptionsQuery = `
         DELETE FROM minedu.options
         WHERE question_id = ANY($1::int[])
       `
       await dbQuery(deleteOptionsQuery, [questionIds])
 
-      // 4️⃣ Eliminar preguntas
       const deleteQuestionsQuery = `
         DELETE FROM minedu.questions
         WHERE id = ANY($1::int[])
@@ -43,7 +40,6 @@ export async function DELETE(req: Request) {
       await dbQuery(deleteQuestionsQuery, [questionIds])
     }
 
-    // 5️⃣ Eliminar la encuesta
     const deleteSurveyQuery = `
       DELETE FROM minedu.surveys
       WHERE id = $1
