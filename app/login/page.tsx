@@ -110,9 +110,9 @@ export default function LoginPage() {
 
             {/* Footer with Links and Button */}
             <div className="flex items-center justify-between pt-4">
-              <Link href="/forgot-password" className="text-sm text-blue-600 hover:underline">
+              {/* <Link href="/forgot-password" className="text-sm text-blue-600 hover:underline">
                 ¿Olvido su contraseña?
-              </Link>
+              </Link> */}
               <Button type="submit" disabled={isLoading} className="bg-gray-800 hover:bg-gray-900 text-white px-6">
                 {isLoading ? "Logging in..." : "INGRESAR"}
               </Button>
