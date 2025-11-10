@@ -1,12 +1,12 @@
 import { NextResponse } from "next/server";
-import { dbQuery } from "@/app/config/connection"; // ✅ tu conexión
+import { dbQuery } from "@/app/config/connection";
 
 export async function GET(req: Request) {
   const { searchParams } = new URL(req.url);
   const schoolId = searchParams.get("school_id");
 
   try {
-    // ✅ Consulta SQL usando schema minedu
+    // Consulta SQL usando schema minedu
     const sql = `
       SELECT 
         a.question_id,
@@ -25,7 +25,7 @@ export async function GET(req: Request) {
 
     const data = result.rows;
 
-    // ✅ Agrupar por pregunta
+    // Agrupar por pregunta
     const grouped: any = {};
 
     data.forEach((row: any) => {
@@ -44,7 +44,6 @@ export async function GET(req: Request) {
         (grouped[qid].results[optText] || 0) + 1;
     });
 
-    // ✅ Convertir a array para el frontend
     const formatted = Object.values(grouped).map((q: any) => ({
       question: q.question,
       data: Object.entries(q.results).map(([name, value]) => ({
