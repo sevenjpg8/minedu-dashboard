@@ -1,7 +1,6 @@
 "use client"
 
 import type React from "react"
-
 import { useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -21,6 +20,11 @@ export default function LoginPage() {
     setIsLoading(true)
     setError(null)
 
+    console.log("📨 Enviando formulario de login")
+    console.log("➡️ Email:", email)
+    console.log("➡️ Password:", password)
+    console.log("➡️ Remember me:", rememberMe)
+
     try {
       const res = await fetch("/api/logueo", {
         method: "POST",
@@ -28,16 +32,21 @@ export default function LoginPage() {
         body: JSON.stringify({ email, password }),
       })
 
+      console.log("📥 Respuesta recibida del servidor:", res)
+
       if (res.ok) {
+        console.log("✅ Login exitoso. Redirigiendo a /dashboard")
         window.location.href = "/dashboard"
       } else {
         const data = await res.json()
+        console.warn("⚠️ Error en login:", data)
         setError(data.message || "Error al iniciar sesión")
       }
     } catch (error) {
-      console.error(error)
+      console.error("💥 Error de conexión o en el servidor:", error)
       setError("Error del servidor")
     } finally {
+      console.log("⏳ Finalizando proceso de login")
       setIsLoading(false)
     }
   }
@@ -49,7 +58,11 @@ export default function LoginPage() {
         <div className="flex justify-center mb-8">
           <div className="flex items-center gap-2">
             <div className="w-15 h-15 rounded flex items-center justify-center">
-              <img src="/logo-minedu.png" alt="Logo Ministerio de Educación" className="w-20 h-20 object-contain" />
+              <img
+                src="/logo-minedu.png"
+                alt="Logo Ministerio de Educación"
+                className="w-20 h-20 object-contain"
+              />
             </div>
           </div>
         </div>
@@ -73,7 +86,10 @@ export default function LoginPage() {
                 type="email"
                 placeholder="Ingrese su correo"
                 value={email}
-                onChange={(e) => setEmail(e.target.value)}
+                onChange={(e) => {
+                  console.log("✏️ Escribiendo email:", e.target.value)
+                  setEmail(e.target.value)
+                }}
                 required
                 className="w-full"
               />
@@ -89,7 +105,10 @@ export default function LoginPage() {
                 type="password"
                 placeholder="Ingrese su contraseña"
                 value={password}
-                onChange={(e) => setPassword(e.target.value)}
+                onChange={(e) => {
+                  console.log("🔐 Escribiendo contraseña:", e.target.value)
+                  setPassword(e.target.value)
+                }}
                 required
                 className="w-full"
               />
@@ -100,7 +119,10 @@ export default function LoginPage() {
               <Checkbox
                 id="remember"
                 checked={rememberMe}
-                onCheckedChange={(checked) => setRememberMe(checked as boolean)}
+                onCheckedChange={(checked) => {
+                  console.log("💾 Cambiado Remember me:", checked)
+                  setRememberMe(checked as boolean)
+                }}
               />
               <label htmlFor="remember" className="text-sm text-gray-700 cursor-pointer">
                 Remember me
@@ -109,7 +131,11 @@ export default function LoginPage() {
 
             {/* Footer with Links and Button */}
             <div className="flex items-center justify-between pt-4">
-              <Button type="submit" disabled={isLoading} className="bg-gray-800 hover:bg-gray-900 text-white px-6">
+              <Button
+                type="submit"
+                disabled={isLoading}
+                className="bg-gray-800 hover:bg-gray-900 text-white px-6"
+              >
                 {isLoading ? "Logging in..." : "INGRESAR"}
               </Button>
             </div>
