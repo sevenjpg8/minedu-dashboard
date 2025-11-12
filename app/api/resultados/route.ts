@@ -1,4 +1,4 @@
-// app/api/reportes/route.ts
+// app/api/resultados/route.ts
 import { NextResponse } from "next/server";
 import { dbQuery } from "@/app/config/connection";
 
@@ -155,7 +155,7 @@ export async function GET(req: Request) {
 
     return NextResponse.json({ success: true, charts });
   } catch (err) {
-    console.error("Error en /api/reportes:", err);
+    console.error("Error en /api/resultados:", err);
     return NextResponse.json(
       { success: false, message: "Error interno del servidor", detail: String(err) },
       { status: 500 }

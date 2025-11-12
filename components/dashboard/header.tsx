@@ -61,14 +61,14 @@ useEffect(() => {
       ? [
           { href: "/dashboard", label: "Dashboard" },
           { href: "/dashboard/encuestas", label: "Encuestas" },
-          { href: "/dashboard/reportes", label: "Reportes" },
+          { href: "/dashboard/resultados", label: "Reportes" },
           { href: "/dashboard/tabla-progreso", label: "Progreso" },
           { href: "/dashboard/importar", label: "Importar Colegios" },
         ]
       : rol === "especialista"
       ? [
           { href: "/dashboard", label: "Dashboard" },
-          { href: "/dashboard/reportes", label: "Reportes" },
+          { href: "/dashboard/resultados", label: "Reportes" },
           { href: "/dashboard/tabla-progreso", label: "Progreso" },
         ]
       : []

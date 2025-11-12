@@ -155,7 +155,7 @@ export default function ReportesPage() {
         Object.entries(filters).filter(([_, v]) => v !== "")
       );
 
-      const res = await fetch(`/api/reportes?${params.toString()}`);
+      const res = await fetch(`/api/resultados?${params.toString()}`);
       const data = await res.json();
 
       if (!data.success) {
