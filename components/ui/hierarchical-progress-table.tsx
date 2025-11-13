@@ -1,5 +1,5 @@
 "use client"
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import { ChevronRight, ArrowLeft, Search, HelpCircle } from "lucide-react"
 
 interface Colegio {
@@ -12,95 +12,28 @@ interface Colegio {
 interface UGEL {
   id: string
   nombre: string
+  totalEncuestas?: number
+  completadas?: number
   colegios: Colegio[]
 }
 
 interface DRE {
   id: string
   nombre: string
+  totalEncuestas?: number
+  completadas?: number
   ugels: UGEL[]
 }
 
-// Datos de ejemplo
-const mockData: DRE[] = [
-  {
-    id: "dre-lima",
-    nombre: "DRE Lima",
-    ugels: [
-      {
-        id: "ugel-lima-este",
-        nombre: "UGEL Lima Este",
-        colegios: [
-          { id: "col-1", nombre: "Colegio San Fernando", totalEncuestas: 450, completadas: 380 },
-          { id: "col-2", nombre: "Colegio Gran Unidad Escolar", totalEncuestas: 520, completadas: 420 },
-        ],
-      },
-      {
-        id: "ugel-lima-norte",
-        nombre: "UGEL Lima Norte",
-        colegios: [
-          { id: "col-3", nombre: "Colegio Mariscal Castilla", totalEncuestas: 380, completadas: 290 },
-          { id: "col-4", nombre: "Colegio Villa El Salvador", totalEncuestas: 410, completadas: 350 },
-        ],
-      },
-      {
-        id: "ugel-lima-sur",
-        nombre: "UGEL Lima Sur",
-        colegios: [
-          { id: "col-5", nombre: "Colegio Miguel Ángel Buonarroti", totalEncuestas: 490, completadas: 430 },
-          { id: "col-6", nombre: "Colegio Jorge Chávez", totalEncuestas: 350, completadas: 280 },
-        ],
-      },
-    ],
-  },
-  {
-    id: "dre-arequipa",
-    nombre: "DRE Arequipa",
-    ugels: [
-      {
-        id: "ugel-arequipa",
-        nombre: "UGEL Arequipa",
-        colegios: [
-          { id: "col-7", nombre: "Colegio Independencia", totalEncuestas: 380, completadas: 340 },
-          { id: "col-8", nombre: "Colegio La Salle", totalEncuestas: 420, completadas: 350 },
-        ],
-      },
-      {
-        id: "ugel-caylloma",
-        nombre: "UGEL Caylloma",
-        colegios: [
-          { id: "col-9", nombre: "Colegio San Juan Bautista", totalEncuestas: 290, completadas: 210 },
-          { id: "col-10", nombre: "Colegio Salesiano", totalEncuestas: 310, completadas: 250 },
-        ],
-      },
-    ],
-  },
-  {
-    id: "dre-cusco",
-    nombre: "DRE Cusco",
-    ugels: [
-      {
-        id: "ugel-cusco",
-        nombre: "UGEL Cusco",
-        colegios: [
-          { id: "col-11", nombre: "Colegio Inca Garcilaso", totalEncuestas: 500, completadas: 440 },
-          { id: "col-12", nombre: "Colegio Andahuaylillas", totalEncuestas: 360, completadas: 300 },
-        ],
-      },
-      {
-        id: "ugel-calca",
-        nombre: "UGEL Calca",
-        colegios: [
-          { id: "col-13", nombre: "Colegio Urubamba", totalEncuestas: 280, completadas: 200 },
-          { id: "col-14", nombre: "Colegio Ollantaytambo", totalEncuestas: 320, completadas: 260 },
-        ],
-      },
-    ],
-  },
-]
+const toNonNegative = (value: unknown) => {
+  const parsed = Number(value)
+  return Number.isFinite(parsed) && parsed >= 0 ? parsed : 0
+}
 
 function ProgressBar({ completadas, total }: { completadas: number; total: number }) {
-  const percentage = Math.round((completadas / total) * 100)
+  const safeTotal = total > 0 ? total : 0
+  const safeCompleted = safeTotal > 0 ? Math.min(completadas, safeTotal) : 0
+  const percentage = safeTotal === 0 ? 0 : Math.round((safeCompleted / safeTotal) * 100)
   const getColor = (pct: number) => {
     if (pct >= 80) return "bg-green-500"
     if (pct >= 50) return "bg-yellow-500"
@@ -159,18 +92,165 @@ function SearchTooltip() {
 }
 
 export function HierarchicalProgressTable() {
+  const [dres, setDres] = useState<DRE[]>([])
+  const [loadingDres, setLoadingDres] = useState(true)
+  const [errorDres, setErrorDres] = useState<string | null>(null)
+  const [ugelsLoading, setUgelsLoading] = useState<Record<string, boolean>>({})
+  const [ugelsError, setUgelsError] = useState<Record<string, string | null>>({})
+  const [schoolsLoading, setSchoolsLoading] = useState<Record<string, boolean>>({})
+  const [schoolsError, setSchoolsError] = useState<Record<string, string | null>>({})
   const [viewState, setViewState] = useState<ViewState>({ type: "dres" })
   const [searchTerm, setSearchTerm] = useState("")
+
+  useEffect(() => {
+    const fetchDres = async () => {
+      try {
+        setLoadingDres(true)
+        setErrorDres(null)
+
+        const response = await fetch("/api/dres")
+        if (!response.ok) throw new Error("No se pudo cargar la lista de DREs")
+
+        const payload = await response.json()
+        const mapped: DRE[] = Array.isArray(payload)
+          ? payload.map((dre: any, index: number) => ({
+              id: String(dre?.id ?? `dre-${index}`),
+              nombre: dre?.name ?? "Sin nombre",
+              totalEncuestas: toNonNegative(dre?.total_students),
+              completadas: toNonNegative(dre?.completed_students),
+              ugels: [],
+            }))
+          : []
+
+        setDres(mapped)
+      } catch (err) {
+        const message = err instanceof Error ? err.message : "Error inesperado al cargar las DREs"
+        setErrorDres(message)
+        setDres([])
+      } finally {
+        setLoadingDres(false)
+      }
+    }
+
+    fetchDres()
+  }, [])
+
+  useEffect(() => {
+    setViewState((prev) => {
+      if (!prev.selectedDRE) return prev
+      const refreshedDre = dres.find((dre) => dre.id === prev.selectedDRE?.id)
+      if (!refreshedDre) return prev
+
+      let changed = false
+      const nextState: ViewState = { ...prev }
+
+      if (refreshedDre !== prev.selectedDRE) {
+        nextState.selectedDRE = refreshedDre
+        changed = true
+      }
+
+      if (prev.selectedUGEL) {
+        const refreshedUGEL = refreshedDre.ugels.find((u) => u.id === prev.selectedUGEL?.id)
+        if (refreshedUGEL && refreshedUGEL !== prev.selectedUGEL) {
+          nextState.selectedUGEL = refreshedUGEL
+          changed = true
+        }
+      }
+
+      return changed ? nextState : prev
+    })
+  }, [dres])
+
+  const loadUgels = async (dreId: string) => {
+    const currentDre = dres.find((dre) => dre.id === dreId)
+    if (!currentDre || currentDre.ugels.length > 0 || ugelsLoading[dreId]) return
+
+    setUgelsLoading((prev) => ({ ...prev, [dreId]: true }))
+    setUgelsError((prev) => ({ ...prev, [dreId]: null }))
+
+    try {
+      const res = await fetch(`/api/ugels?dreId=${encodeURIComponent(dreId)}`)
+      if (!res.ok) throw new Error("No se pudieron cargar las UGELs")
+
+      const data = await res.json()
+      const mapped: UGEL[] = Array.isArray(data)
+        ? data.map((ugel: any, index: number) => ({
+            id: String(ugel?.id ?? `ugel-${dreId}-${index}`),
+            nombre: ugel?.name ?? "Sin nombre",
+            totalEncuestas: toNonNegative(ugel?.total_students),
+            completadas: toNonNegative(ugel?.completed_students),
+            colegios: [],
+          }))
+        : []
+
+      setDres((prev) =>
+        prev.map((dre) => (dre.id === dreId ? { ...dre, ugels: mapped } : dre)),
+      )
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Error inesperado al cargar las UGELs"
+      setUgelsError((prev) => ({ ...prev, [dreId]: message }))
+    } finally {
+      setUgelsLoading((prev) => ({ ...prev, [dreId]: false }))
+    }
+  }
+
+  const loadSchools = async (dreId: string, ugelId: string) => {
+    const currentDre = dres.find((dre) => dre.id === dreId)
+    const currentUGEL = currentDre?.ugels.find((ugel) => ugel.id === ugelId)
+    if (!currentUGEL || currentUGEL.colegios.length > 0 || schoolsLoading[ugelId]) return
+
+    setSchoolsLoading((prev) => ({ ...prev, [ugelId]: true }))
+    setSchoolsError((prev) => ({ ...prev, [ugelId]: null }))
+
+    try {
+      const res = await fetch(`/api/schools?ugelId=${encodeURIComponent(ugelId)}`)
+      if (!res.ok) throw new Error("No se pudieron cargar los colegios")
+
+      const data = await res.json()
+      const mapped: Colegio[] = Array.isArray(data)
+        ? data.map((colegio: any, index: number) => ({
+            id: String(colegio?.id ?? `school-${ugelId}-${index}`),
+            nombre: colegio?.name ?? "Sin nombre",
+            totalEncuestas: toNonNegative(colegio?.total_students),
+            completadas: toNonNegative(colegio?.completed_students),
+          }))
+        : []
+
+      setDres((prev) =>
+        prev.map((dre) =>
+          dre.id === dreId
+            ? {
+                ...dre,
+                ugels: dre.ugels.map((ugel) => (ugel.id === ugelId ? { ...ugel, colegios: mapped } : ugel)),
+              }
+            : dre,
+        ),
+      )
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Error inesperado al cargar los colegios"
+      setSchoolsError((prev) => ({ ...prev, [ugelId]: message }))
+    } finally {
+      setSchoolsLoading((prev) => ({ ...prev, [ugelId]: false }))
+    }
+  }
 
   const handleSelectDRE = (dre: DRE) => {
     setViewState({ type: "ugels", selectedDRE: dre })
     setSearchTerm("")
+
+    if (!dre.ugels || dre.ugels.length === 0) {
+      loadUgels(dre.id)
+    }
   }
 
   const handleSelectUGEL = (ugel: UGEL) => {
     if (viewState.selectedDRE) {
       setViewState({ type: "colegios", selectedDRE: viewState.selectedDRE, selectedUGEL: ugel })
       setSearchTerm("")
+
+      if (!ugel.colegios || ugel.colegios.length === 0) {
+        loadSchools(viewState.selectedDRE.id, ugel.id)
+      }
     }
   }
 
@@ -217,19 +297,50 @@ export function HierarchicalProgressTable() {
         </div>
       </div>
 
-      {viewState.type === "dres" && <DREsTable onSelectDRE={handleSelectDRE} searchTerm={searchTerm} />}
+      {viewState.type === "dres" && (
+        <DREsTable
+          dres={dres}
+          loading={loadingDres}
+          error={errorDres}
+          onSelectDRE={handleSelectDRE}
+          searchTerm={searchTerm}
+        />
+      )}
       {viewState.type === "ugels" && viewState.selectedDRE && (
-        <UGELsTable dre={viewState.selectedDRE} onSelectUGEL={handleSelectUGEL} searchTerm={searchTerm} />
+        <UGELsTable
+          dre={viewState.selectedDRE}
+          onSelectUGEL={handleSelectUGEL}
+          searchTerm={searchTerm}
+          loading={!!ugelsLoading[viewState.selectedDRE.id]}
+          error={ugelsError[viewState.selectedDRE.id] ?? null}
+        />
       )}
       {viewState.type === "colegios" && viewState.selectedUGEL && (
-        <ColegiosTable ugel={viewState.selectedUGEL} searchTerm={searchTerm} />
+        <ColegiosTable
+          ugel={viewState.selectedUGEL}
+          searchTerm={searchTerm}
+          loading={!!schoolsLoading[viewState.selectedUGEL.id]}
+          error={schoolsError[viewState.selectedUGEL.id] ?? null}
+        />
       )}
     </div>
   )
 }
 
-function DREsTable({ onSelectDRE, searchTerm }: { onSelectDRE: (dre: DRE) => void; searchTerm: string }) {
-  const filteredDREs = mockData.filter((dre) => dre.nombre.toLowerCase().includes(searchTerm.toLowerCase()))
+function DREsTable({
+  dres,
+  loading,
+  error,
+  onSelectDRE,
+  searchTerm,
+}: {
+  dres: DRE[]
+  loading: boolean
+  error: string | null
+  onSelectDRE: (dre: DRE) => void
+  searchTerm: string
+}) {
+  const filteredDREs = dres.filter((dre) => dre.nombre.toLowerCase().includes(searchTerm.toLowerCase()))
 
   return (
     <div className="overflow-x-auto">
@@ -243,16 +354,28 @@ function DREsTable({ onSelectDRE, searchTerm }: { onSelectDRE: (dre: DRE) => voi
           </tr>
         </thead>
         <tbody>
-          {filteredDREs.length > 0 ? (
+          {loading ? (
+            <tr>
+              <td colSpan={4} className="px-4 py-8 text-center text-sm text-slate-500">
+                Cargando DREs...
+              </td>
+            </tr>
+          ) : error ? (
+            <tr>
+              <td colSpan={4} className="px-4 py-8 text-center text-sm text-red-600">{error}</td>
+            </tr>
+          ) : filteredDREs.length > 0 ? (
             filteredDREs.map((dre) => {
-              const dreTotal = dre.ugels.reduce(
+              const dreTotalFromUgels = dre.ugels.reduce(
                 (sum, ugel) => sum + ugel.colegios.reduce((ugelSum, col) => ugelSum + col.totalEncuestas, 0),
                 0,
               )
-              const dreCompletadas = dre.ugels.reduce(
+              const dreCompletadasFromUgels = dre.ugels.reduce(
                 (sum, ugel) => sum + ugel.colegios.reduce((ugelSum, col) => ugelSum + col.completadas, 0),
                 0,
               )
+              const dreTotal = dre.totalEncuestas ?? dreTotalFromUgels
+              const dreCompletadas = dre.completadas ?? dreCompletadasFromUgels
 
               return (
                 <tr
@@ -293,10 +416,14 @@ function UGELsTable({
   dre,
   onSelectUGEL,
   searchTerm,
+  loading,
+  error,
 }: {
   dre: DRE
   onSelectUGEL: (ugel: UGEL) => void
   searchTerm: string
+  loading: boolean
+  error: string | null
 }) {
   const filteredUGELs = dre.ugels.filter((ugel) => ugel.nombre.toLowerCase().includes(searchTerm.toLowerCase()))
 
@@ -315,10 +442,22 @@ function UGELsTable({
           </tr>
         </thead>
         <tbody>
-          {filteredUGELs.length > 0 ? (
+          {loading ? (
+            <tr>
+              <td colSpan={4} className="px-4 py-8 text-center text-sm text-slate-500">
+                Cargando UGELs...
+              </td>
+            </tr>
+          ) : error ? (
+            <tr>
+              <td colSpan={4} className="px-4 py-8 text-center text-sm text-red-600">{error}</td>
+            </tr>
+          ) : filteredUGELs.length > 0 ? (
             filteredUGELs.map((ugel) => {
-              const ugelTotal = ugel.colegios.reduce((sum, c) => sum + c.totalEncuestas, 0)
-              const ugelCompletadas = ugel.colegios.reduce((sum, c) => sum + c.completadas, 0)
+              const ugelTotalFromSchools = ugel.colegios.reduce((sum, c) => sum + c.totalEncuestas, 0)
+              const ugelCompletadasFromSchools = ugel.colegios.reduce((sum, c) => sum + c.completadas, 0)
+              const ugelTotal = ugel.totalEncuestas ?? ugelTotalFromSchools
+              const ugelCompletadas = ugel.completadas ?? ugelCompletadasFromSchools
 
               return (
                 <tr
@@ -343,11 +482,19 @@ function UGELsTable({
               )
             })
           ) : (
-            <tr>
-              <td colSpan={4} className="px-4 py-8 text-center text-sm text-slate-500">
-                No se encontraron resultados para "{searchTerm}"
-              </td>
-            </tr>
+            searchTerm ? (
+              <tr>
+                <td colSpan={4} className="px-4 py-8 text-center text-sm text-slate-500">
+                  No se encontraron resultados para "{searchTerm}"
+                </td>
+              </tr>
+            ) : (
+              <tr>
+                <td colSpan={4} className="px-4 py-8 text-center text-sm text-slate-500">
+                  Esta DRE aún no tiene UGELs registradas.
+                </td>
+              </tr>
+            )
           )}
         </tbody>
       </table>
@@ -355,7 +502,17 @@ function UGELsTable({
   )
 }
 
-function ColegiosTable({ ugel, searchTerm }: { ugel: UGEL; searchTerm: string }) {
+function ColegiosTable({
+  ugel,
+  searchTerm,
+  loading,
+  error,
+}: {
+  ugel: UGEL
+  searchTerm: string
+  loading: boolean
+  error: string | null
+}) {
   const filteredColegios = ugel.colegios.filter((colegio) =>
     colegio.nombre.toLowerCase().includes(searchTerm.toLowerCase()),
   )
@@ -375,12 +532,19 @@ function ColegiosTable({ ugel, searchTerm }: { ugel: UGEL; searchTerm: string })
           </tr>
         </thead>
         <tbody>
-          {filteredColegios.length > 0 ? (
+          {loading ? (
+            <tr>
+              <td colSpan={4} className="px-4 py-8 text-center text-sm text-slate-500">
+                Cargando colegios...
+              </td>
+            </tr>
+          ) : error ? (
+            <tr>
+              <td colSpan={4} className="px-4 py-8 text-center text-sm text-red-600">{error}</td>
+            </tr>
+          ) : filteredColegios.length > 0 ? (
             filteredColegios.map((colegio) => (
-              <tr
-                key={colegio.id}
-                className="border-b border-slate-100 bg-slate-50 hover:bg-slate-50 transition-colors"
-              >
+              <tr key={colegio.id} className="border-b border-slate-100 bg-slate-50 hover:bg-slate-50 transition-colors">
                 <td className="px-4 py-3">
                   <span className="text-sm text-slate-700">{colegio.nombre}</span>
                 </td>
@@ -393,10 +557,16 @@ function ColegiosTable({ ugel, searchTerm }: { ugel: UGEL; searchTerm: string })
                 </td>
               </tr>
             ))
-          ) : (
+          ) : searchTerm ? (
             <tr>
               <td colSpan={4} className="px-4 py-8 text-center text-sm text-slate-500">
                 No se encontraron resultados para "{searchTerm}"
+              </td>
+            </tr>
+          ) : (
+            <tr>
+              <td colSpan={4} className="px-4 py-8 text-center text-sm text-slate-500">
+                Esta UGEL aún no tiene colegios registrados.
               </td>
             </tr>
           )}

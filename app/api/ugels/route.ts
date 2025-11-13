@@ -6,15 +6,28 @@ export async function GET(req: Request) {
     const { searchParams } = new URL(req.url)
     const dreId = searchParams.get("dreId")
 
-    let query = `SELECT id, name FROM minedu.ugel_new`
     const params: any[] = []
-
+    let whereClause = ""
     if (dreId) {
-      query += ` WHERE dre_id=$1`
+      whereClause = `WHERE u.dre_id = $1`
       params.push(dreId)
     }
 
-    query += ` ORDER BY name ASC`
+    const query = `
+      SELECT
+        u.id,
+        u.name,
+        COALESCE(SUM(COALESCE(s.cantidad_estudiantes, 0)), 0) AS total_students,
+        COALESCE(COUNT(sp.id), 0) AS completed_students
+      FROM minedu.ugel_new u
+      LEFT JOIN minedu.school_new s ON s.ugel_id = u.id
+      LEFT JOIN minedu.survey_participations sp 
+        ON sp.school_id = s.id
+        AND sp.completed_at IS NOT NULL
+      ${whereClause}
+      GROUP BY u.id, u.name
+      ORDER BY u.name ASC
+    `
 
     const res = await dbQuery(query, params)
     return NextResponse.json(res.rows)
