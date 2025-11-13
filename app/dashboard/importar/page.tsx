@@ -1,18 +1,63 @@
+// app/dashboard/importar/page.tsx
 "use client"
 
-import type React from "react"
-
 import { useState } from "react"
+import Papa from "papaparse"
 import { Upload } from "lucide-react"
 
 export default function ImportarPage() {
   const [fileName, setFileName] = useState<string | null>(null)
+  const [data, setData] = useState<any[]>([])
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files && e.target.files[0]) {
-      setFileName(e.target.files[0].name)
+    const file = e.target.files?.[0]
+    if (!file) return
+
+    setFileName(file.name)
+
+    // Validar extensión
+    if (!file.name.endsWith(".csv")) {
+      alert("Por favor selecciona un archivo CSV.")
+      return
+    }
+
+    Papa.parse(file, {
+      header: true, // Usa la primera fila como encabezado
+      skipEmptyLines: true,
+      complete: (result) => {
+        console.log("Datos importados:", result.data)
+        setData(result.data)
+      },
+      error: (err) => {
+        console.error("Error al leer el CSV:", err)
+        alert("Ocurrió un error al procesar el archivo.")
+      },
+    })
+  }
+
+  const handleImport = async () => {
+    if (data.length === 0) {
+      alert("No hay datos para importar.")
+      return
+    }
+
+    try {
+      const res = await fetch("/api/importar", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(data),
+      })
+
+      const result = await res.json()
+      if (!res.ok) throw new Error(result.error || "Error al importar")
+
+      alert(result.message)
+    } catch (error) {
+      console.error("Error al importar:", error)
+      alert("Ocurrió un error al importar los datos.")
     }
   }
+
 
   return (
     <div>
@@ -25,7 +70,7 @@ export default function ImportarPage() {
             <li className="flex gap-2">
               <span className="font-medium">•</span>
               <span>
-                El archivo a subir debe ser un <span className="font-semibold">XLSX o XLS</span>.
+                El archivo a subir debe ser un <span className="font-semibold">CSV</span>.
               </span>
             </li>
             <li className="flex gap-2">
@@ -48,13 +93,16 @@ export default function ImportarPage() {
             <label className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg cursor-pointer transition-colors">
               <Upload size={18} />
               Choose File
-              <input type="file" accept=".xlsx,.xls" onChange={handleFileChange} className="hidden" />
+              <input type="file" accept=".csv" onChange={handleFileChange} className="hidden" />
             </label>
             <span className="text-gray-600">{fileName || "No file chosen"}</span>
           </div>
         </div>
 
-        <button className="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-6 rounded-lg transition-colors">
+        <button
+          onClick={handleImport}
+          className="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-6 rounded-lg transition-colors"
+        >
           INICIAR IMPORTACIÓN
         </button>
       </div>
