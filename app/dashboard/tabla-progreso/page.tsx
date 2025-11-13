@@ -85,28 +85,7 @@ export default function TablaProgresoPage() {
           </Card>
         </div>
 
-        {/* Lista de DREs */}
-        <Card className="border-slate-200">
-          <CardHeader className="border-b border-slate-200">
-            <CardTitle className="text-slate-900">Direcciones Regionales de Educación</CardTitle>
-            <CardDescription>Listado completo proveniente de la API `/api/dres`</CardDescription>
-          </CardHeader>
-          <CardContent className="pt-6">
-            {loadingDres && <p className="text-sm text-slate-500">Cargando DREs...</p>}
-            {errorDres && <p className="text-sm text-red-600">{errorDres}</p>}
-            {!loadingDres && !errorDres && (
-              <ul className="divide-y divide-slate-200 rounded-lg border border-slate-200 bg-white">
-                {dres.map((dre) => (
-                  <li key={dre.id} className="flex items-center justify-between px-4 py-3">
-                    <span className="font-medium text-slate-900">{dre.name}</span>
-                    <span className="text-sm text-slate-500">ID: {dre.id}</span>
-                  </li>
-                ))}
-                {dres.length === 0 && <li className="px-4 py-3 text-sm text-slate-500">No se encontraron DREs.</li>}
-              </ul>
-            )}
-          </CardContent>
-        </Card>
+
 
         {/* Progress Table */}
         <Card className="border-slate-200">
