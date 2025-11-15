@@ -25,7 +25,6 @@ export default function LoginPage() {
     console.log("📨 Enviando formulario de login")
     console.log("➡️ Email:", email)
     console.log("➡️ Password:", password)
-    console.log("➡️ Remember me:", rememberMe)
 
     try {
       const res = await fetch("/api/logueo", {
@@ -116,21 +115,6 @@ export default function LoginPage() {
               />
             </div>
 
-            {/* Remember Me Checkbox */}
-            <div className="flex items-center space-x-2">
-              <Checkbox
-                id="remember"
-                checked={rememberMe}
-                onCheckedChange={(checked) => {
-                  console.log("💾 Cambiado Remember me:", checked)
-                  setRememberMe(checked as boolean)
-                }}
-              />
-              <label htmlFor="remember" className="text-sm text-gray-700 cursor-pointer">
-                Remember me
-              </label>
-            </div>
-
             {/* Footer with Links and Button */}
             <div className="flex items-center justify-between pt-4">
               <Button
@@ -138,7 +122,7 @@ export default function LoginPage() {
                 disabled={isLoading}
                 className="bg-gray-800 hover:bg-gray-900 text-white px-6"
               >
-                {isLoading ? "Logging in..." : "INGRESAR"}
+                {isLoading ? "Iniciando sesión..." : "INGRESAR"}
               </Button>
             </div>
           </form>

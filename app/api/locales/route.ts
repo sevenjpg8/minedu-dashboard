@@ -1,3 +1,4 @@
+// app/api/locales/route.ts
 import { NextResponse } from "next/server";
 import { dbQuery } from "@/app/config/connection";
 
@@ -7,68 +8,103 @@ export async function GET() {
       WITH participaciones AS (
         SELECT DISTINCT sp.school_id
         FROM minedu.survey_participations sp
-        WHERE sp.completed_at IS NOT NULL
+        WHERE sp.school_id IS NOT NULL
       )
+
       SELECT
         'Solo Primaria' AS categoria,
-        COUNT(DISTINCT CASE WHEN s.nivel_educativo ILIKE '%primaria%' THEN s.id END) AS total,
-        COUNT(DISTINCT CASE WHEN s.nivel_educativo ILIKE '%primaria%' AND s.gestion ILIKE '%directa%' THEN s.id END) AS publica,
-        COUNT(DISTINCT CASE WHEN s.nivel_educativo ILIKE '%primaria%' AND s.gestion ILIKE '%privada%' THEN s.id END) AS privada
-      FROM minedu.school_new s
+        COUNT(DISTINCT CASE WHEN s.nivel_educativo ILIKE '%primaria%' THEN s.id END)::int AS total,
+        COUNT(DISTINCT CASE WHEN s.nivel_educativo ILIKE '%primaria%' AND s.gestion ILIKE '%Pública%' THEN s.id END)::int AS publica,
+        COUNT(DISTINCT CASE WHEN s.nivel_educativo ILIKE '%primaria%' AND s.gestion ILIKE '%Privada%' THEN s.id END)::int AS privada
+      FROM minedu.school_new_old s
       JOIN participaciones p ON p.school_id = s.id
 
       UNION ALL
 
       SELECT
         'Solo Secundaria' AS categoria,
-        COUNT(DISTINCT CASE WHEN s.nivel_educativo ILIKE '%secundaria%' THEN s.id END) AS total,
-        COUNT(DISTINCT CASE WHEN s.nivel_educativo ILIKE '%secundaria%' AND s.gestion ILIKE '%directa%' THEN s.id END) AS publica,
-        COUNT(DISTINCT CASE WHEN s.nivel_educativo ILIKE '%secundaria%' AND s.gestion ILIKE '%privada%' THEN s.id END) AS privada
-      FROM minedu.school_new s
+        COUNT(DISTINCT CASE WHEN s.nivel_educativo ILIKE '%secundaria%' THEN s.id END)::int AS total,
+        COUNT(DISTINCT CASE WHEN s.nivel_educativo ILIKE '%secundaria%' AND s.gestion ILIKE '%Pública%' THEN s.id END)::int AS publica,
+        COUNT(DISTINCT CASE WHEN s.nivel_educativo ILIKE '%secundaria%' AND s.gestion ILIKE '%Privada%' THEN s.id END)::int AS privada
+      FROM minedu.school_new_old s
       JOIN participaciones p ON p.school_id = s.id
 
       UNION ALL
 
       SELECT
         'A nivel de UGEL' AS categoria,
-        COUNT(DISTINCT s.ugel_id) AS total,
-        COUNT(DISTINCT CASE WHEN s.gestion ILIKE '%directa%' THEN s.ugel_id END) AS publica,
-        COUNT(DISTINCT CASE WHEN s.gestion ILIKE '%privada%' THEN s.ugel_id END) AS privada
-      FROM minedu.school_new s
+        COUNT(DISTINCT s.ugel_id)::int AS total,
+        COUNT(DISTINCT CASE WHEN s.gestion ILIKE '%Pública%' THEN s.ugel_id END)::int AS publica,
+        COUNT(DISTINCT CASE WHEN s.gestion ILIKE '%Privada%' THEN s.ugel_id END)::int AS privada
+      FROM minedu.school_new_old s
       JOIN participaciones p ON p.school_id = s.id
+      WHERE s.ugel_id IS NOT NULL
 
       UNION ALL
 
       SELECT
         'A nivel de DRE' AS categoria,
-        COUNT(DISTINCT u.dre_id) AS total,
-        COUNT(DISTINCT CASE WHEN s.gestion ILIKE '%directa%' THEN u.dre_id END) AS publica,
-        COUNT(DISTINCT CASE WHEN s.gestion ILIKE '%privada%' THEN u.dre_id END) AS privada
-      FROM minedu.school_new s
+        COUNT(DISTINCT u.dre_id)::int AS total,
+        COUNT(DISTINCT CASE WHEN s.gestion ILIKE '%Pública%' THEN u.dre_id END)::int AS publica,
+        COUNT(DISTINCT CASE WHEN s.gestion ILIKE '%Privada%' THEN u.dre_id END)::int AS privada
+      FROM minedu.school_new_old s
       JOIN minedu.ugel_new u ON u.id = s.ugel_id
-      JOIN participaciones p ON p.school_id = s.id;
+      JOIN participaciones p ON p.school_id = s.id
+      WHERE u.dre_id IS NOT NULL;
     `;
 
     const { rows } = await dbQuery(query);
 
-    // Totales nacionales (sumatoria general)
-    const totalNacional = rows.reduce(
-      (acc, r) => ({
-        total: acc.total + Number(r.total),
-        publica: acc.publica + Number(r.publica),
-        privada: acc.privada + Number(r.privada),
-      }),
-      { total: 0, publica: 0, privada: 0 }
-    );
+    const colegios = {
+      total: rows
+        .filter(r => r.categoria === 'Solo Primaria' || r.categoria === 'Solo Secundaria')
+        .reduce((acc, r) => ({
+          total: acc.total + Number(r.total),
+          publica: acc.publica + Number(r.publica),
+          privada: acc.privada + Number(r.privada),
+        }), { total: 0, publica: 0, privada: 0 })
+    };
+
+    const ugelRow = rows.find(r => r.categoria === 'A nivel de UGEL') ?? { total: 0, publica: 0, privada: 0 };
+    const dreRow = rows.find(r => r.categoria === 'A nivel de DRE') ?? { total: 0, publica: 0, privada: 0 };
+
+    const totalNacional = rows
+      .filter(r => r.categoria === "Solo Primaria" || r.categoria === "Solo Secundaria")
+      .reduce(
+        (acc, r) => ({
+          total: acc.total + r.total,
+          publica: acc.publica + r.publica,
+          privada: acc.privada + r.privada,
+        }),
+        { total: 0, publica: 0, privada: 0 }
+      );
+
 
     return NextResponse.json({
       locales: rows,
-      total: totalNacional,
+      total: {
+        total: totalNacional.total,
+        publica: totalNacional.publica,
+        privada: totalNacional.privada,
+      },
+       totales: {
+         colegios,
+         ugel: {
+           total: Number(ugelRow.total ?? 0),
+           publica: Number(ugelRow.publica ?? 0),
+           privada: Number(ugelRow.privada ?? 0)
+         },
+         dre: {
+           total: Number(dreRow.total ?? 0),
+           publica: Number(dreRow.publica ?? 0),
+           privada: Number(dreRow.privada ?? 0)
+         }
+       }
     });
-  } catch (error) {
-    console.error("❌ Error obteniendo locales:", error);
+  } catch (error: any) {
+    console.error("❌ Error obteniendo locales:", error?.message ?? error);
     return NextResponse.json(
-      { error: "Error obteniendo locales" },
+      { error: error?.message ?? "Error obteniendo locales" },
       { status: 500 }
     );
   }

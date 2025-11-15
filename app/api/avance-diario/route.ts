@@ -4,18 +4,17 @@ import { dbQuery } from "@/app/config/connection"
 
 export async function GET() {
   try {
-    // 🔹 Consulta: contar encuestas completadas por día y tipo de gestión
     const query = `
       SELECT 
         TO_CHAR(completed_at, 'FMDay') AS day_name,
         s.gestion,
         COUNT(*) AS total
       FROM minedu.survey_participations sp
-      JOIN minedu.school_new s ON sp.school_id = s.id
+      JOIN minedu.school_new_old s ON sp.school_id = s.id
       WHERE completed_at IS NOT NULL
       GROUP BY day_name, s.gestion
       ORDER BY MIN(completed_at)
-    `
+    `;
 
     const result = await dbQuery(query)
 
