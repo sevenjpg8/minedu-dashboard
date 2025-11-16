@@ -14,7 +14,7 @@ export async function GET(req: Request) {
 
     const sql = `
       SELECT id, name, nivel_educativo
-      FROM minedu.school_new
+      FROM minedu.school_new_old
       WHERE ugel_id = $1
         AND name ILIKE $2
       ORDER BY name ASC

@@ -4,15 +4,12 @@ import type React from "react"
 import { useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { Checkbox } from "@/components/ui/checkbox"
 import { ErrorAlert } from "@/components/ui/error-alert"
-import Link from "next/link"
 import { useRouter } from "next/navigation";
 
 export default function LoginPage() {
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
-  const [rememberMe, setRememberMe] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const router = useRouter();
@@ -22,10 +19,6 @@ export default function LoginPage() {
     setIsLoading(true)
     setError(null)
 
-    console.log("📨 Enviando formulario de login")
-    console.log("➡️ Email:", email)
-    console.log("➡️ Password:", password)
-
     try {
       const res = await fetch("/api/logueo", {
         method: "POST",
@@ -33,10 +26,7 @@ export default function LoginPage() {
         body: JSON.stringify({ email, password }),
       })
 
-      console.log("📥 Respuesta recibida del servidor:", res)
-
       if (res.ok) {
-        console.log("✅ Login exitoso. Redirigiendo a /dashboard")
         router.push("/dashboard")
       } else {
         const data = await res.json()
@@ -122,7 +112,7 @@ export default function LoginPage() {
                 disabled={isLoading}
                 className="bg-gray-800 hover:bg-gray-900 text-white px-6"
               >
-                {isLoading ? "Iniciando sesión..." : "INGRESAR"}
+                {isLoading ? "Iniciando sesión..." : "Ingresar"}
               </Button>
             </div>
           </form>

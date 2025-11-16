@@ -11,7 +11,7 @@ export async function GET() {
         COALESCE(COUNT(sp.id), 0) AS completed_students
       FROM minedu.dres d
       LEFT JOIN minedu.ugel_new u ON u.dre_id = d.id
-      LEFT JOIN minedu.school_new s ON s.ugel_id = u.id
+      LEFT JOIN minedu.school_new_old s ON s.ugel_id = u.id
       LEFT JOIN minedu.survey_participations sp 
         ON sp.school_id = s.id
         AND sp.completed_at IS NOT NULL
