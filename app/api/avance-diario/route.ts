@@ -10,7 +10,7 @@ export async function GET() {
         s.gestion,
         COUNT(*) AS total
       FROM minedu.survey_participations sp
-      JOIN minedu.school_new_old s ON sp.school_id = s.id
+      JOIN minedu.school_new s ON sp.school_id = s.id
       WHERE completed_at IS NOT NULL
       GROUP BY day_name, s.gestion
       ORDER BY MIN(completed_at)

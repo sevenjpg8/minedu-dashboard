@@ -54,7 +54,7 @@ export async function GET(req: Request) {
 
       if (ugelIds.length > 0) {
         const schoolsRes = await dbQuery(
-          `SELECT id FROM minedu.school_new_old WHERE ugel_id = ANY($1::int[])`,
+          `SELECT id FROM minedu.school_new WHERE ugel_id = ANY($1::int[])`,
           [ugelIds]
         );
         const schoolIds = schoolsRes.rows.map((s) => Number(s.id));
@@ -72,7 +72,7 @@ export async function GET(req: Request) {
     // 3️⃣ Filtro por UGEL
     if (ugelId) {
       const schoolsUgelRes = await dbQuery(
-        `SELECT id FROM minedu.school_new_old WHERE ugel_id = $1`,
+        `SELECT id FROM minedu.school_new WHERE ugel_id = $1`,
         [ugelId]
       );
       const schoolsUgelIds = schoolsUgelRes.rows.map((s) => Number(s.id));

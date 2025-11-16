@@ -21,7 +21,7 @@ export async function GET(req: Request) {
         s.name,
         COALESCE(s.cantidad_estudiantes, 0) AS total_students,
         COALESCE(COUNT(sp.id), 0) AS completed_students
-      FROM minedu.school_new_old s
+      FROM minedu.school_new s
       LEFT JOIN minedu.survey_participations sp 
         ON sp.school_id = s.id
         AND sp.completed_at IS NOT NULL

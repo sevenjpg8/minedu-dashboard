@@ -6,50 +6,56 @@ export async function GET() {
   try {
     const query = `
       WITH participaciones AS (
-        SELECT DISTINCT sp.school_id
+        SELECT DISTINCT 
+          sp.school_id,
+          sp.education_level
         FROM minedu.survey_participations sp
         WHERE sp.school_id IS NOT NULL
       )
 
+      -- PRIMARIA
       SELECT
         'Solo Primaria' AS categoria,
-        COUNT(DISTINCT CASE WHEN s.nivel_educativo ILIKE '%primaria%' THEN s.id END)::int AS total,
-        COUNT(DISTINCT CASE WHEN s.nivel_educativo ILIKE '%primaria%' AND s.gestion ILIKE '%Pública%' THEN s.id END)::int AS publica,
-        COUNT(DISTINCT CASE WHEN s.nivel_educativo ILIKE '%primaria%' AND s.gestion ILIKE '%Privada%' THEN s.id END)::int AS privada
-      FROM minedu.school_new_old s
-      JOIN participaciones p ON p.school_id = s.id
+        COUNT(DISTINCT CASE WHEN p.education_level ILIKE '%primaria%' THEN p.school_id END)::int AS total,
+        COUNT(DISTINCT CASE WHEN p.education_level ILIKE '%primaria%' AND s.gestion ILIKE '%Pública%' THEN p.school_id END)::int AS publica,
+        COUNT(DISTINCT CASE WHEN p.education_level ILIKE '%primaria%' AND s.gestion ILIKE '%Privada%' THEN p.school_id END)::int AS privada
+      FROM participaciones p
+      JOIN minedu.school_new s ON s.id = p.school_id
 
       UNION ALL
 
+      -- SECUNDARIA
       SELECT
         'Solo Secundaria' AS categoria,
-        COUNT(DISTINCT CASE WHEN s.nivel_educativo ILIKE '%secundaria%' THEN s.id END)::int AS total,
-        COUNT(DISTINCT CASE WHEN s.nivel_educativo ILIKE '%secundaria%' AND s.gestion ILIKE '%Pública%' THEN s.id END)::int AS publica,
-        COUNT(DISTINCT CASE WHEN s.nivel_educativo ILIKE '%secundaria%' AND s.gestion ILIKE '%Privada%' THEN s.id END)::int AS privada
-      FROM minedu.school_new_old s
-      JOIN participaciones p ON p.school_id = s.id
+        COUNT(DISTINCT CASE WHEN p.education_level ILIKE '%secundaria%' THEN p.school_id END)::int AS total,
+        COUNT(DISTINCT CASE WHEN p.education_level ILIKE '%secundaria%' AND s.gestion ILIKE '%Pública%' THEN p.school_id END)::int AS publica,
+        COUNT(DISTINCT CASE WHEN p.education_level ILIKE '%secundaria%' AND s.gestion ILIKE '%Privada%' THEN p.school_id END)::int AS privada
+      FROM participaciones p
+      JOIN minedu.school_new s ON s.id = p.school_id
 
       UNION ALL
 
+      -- UGEL
       SELECT
         'A nivel de UGEL' AS categoria,
         COUNT(DISTINCT s.ugel_id)::int AS total,
         COUNT(DISTINCT CASE WHEN s.gestion ILIKE '%Pública%' THEN s.ugel_id END)::int AS publica,
         COUNT(DISTINCT CASE WHEN s.gestion ILIKE '%Privada%' THEN s.ugel_id END)::int AS privada
-      FROM minedu.school_new_old s
-      JOIN participaciones p ON p.school_id = s.id
+      FROM participaciones p
+      JOIN minedu.school_new s ON s.id = p.school_id
       WHERE s.ugel_id IS NOT NULL
 
       UNION ALL
 
+      -- DRE
       SELECT
         'A nivel de DRE' AS categoria,
         COUNT(DISTINCT u.dre_id)::int AS total,
         COUNT(DISTINCT CASE WHEN s.gestion ILIKE '%Pública%' THEN u.dre_id END)::int AS publica,
         COUNT(DISTINCT CASE WHEN s.gestion ILIKE '%Privada%' THEN u.dre_id END)::int AS privada
-      FROM minedu.school_new_old s
+      FROM participaciones p
+      JOIN minedu.school_new s ON s.id = p.school_id
       JOIN minedu.ugel_new u ON u.id = s.ugel_id
-      JOIN participaciones p ON p.school_id = s.id
       WHERE u.dre_id IS NOT NULL;
     `;
 
