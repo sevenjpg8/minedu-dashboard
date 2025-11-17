@@ -23,14 +23,6 @@ export default function Dashboard() {
 
   const lightBg = "#f8f9fa"
 
-  const [expandedSubRow, setExpandedSubRow] = useState<"Grado" | "Seccion" | null>(null)
-
-
-  const toggleSubExpand = (sub: "Grado" | "Seccion") => {
-    setExpandedSubRow(expandedSubRow === sub ? null : sub)
-  }
-
-
   useEffect(() => {
     const fetchData = async () => {
       try {

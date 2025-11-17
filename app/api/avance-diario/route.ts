@@ -8,10 +8,12 @@ export async function GET() {
       SELECT 
         TO_CHAR(completed_at, 'FMDay') AS day_name,
         s.gestion,
-        COUNT(*) AS total
+        COUNT(*) AS total,
+        MIN(completed_at) AS min_date
       FROM minedu.survey_participations sp
       JOIN minedu.school_new s ON sp.school_id = s.id
       WHERE completed_at IS NOT NULL
+        AND completed_at >= NOW() - INTERVAL '7 days'
       GROUP BY day_name, s.gestion
       ORDER BY MIN(completed_at)
     `;
@@ -47,8 +49,11 @@ export async function GET() {
       if (index !== -1) {
         const gestion = (row.gestion || "").toLowerCase()
 
-        if (gestion.includes("privada")) dataByDay[index].private += Number(row.total)
-        else dataByDay[index].public += Number(row.total) // todo lo demás lo consideramos pública
+        if (gestion.includes("privada")) {
+          dataByDay[index].private += Number(row.total)
+        } else {
+          dataByDay[index].public += Number(row.total)
+        }
 
         dataByDay[index].total += Number(row.total)
       }
