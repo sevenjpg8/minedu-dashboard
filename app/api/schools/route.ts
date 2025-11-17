@@ -17,16 +17,16 @@ export async function GET(req: Request) {
 
     const sql = `
       SELECT 
-        s.id, 
+        MIN(s.id) AS id, 
         s.name,
-        COALESCE(s.cantidad_estudiantes, 0) AS total_students,
+        COALESCE(SUM(COALESCE(s.cantidad_estudiantes, 0)), 0) AS total_students,
         COALESCE(COUNT(sp.id), 0) AS completed_students
       FROM minedu.school_new s
       LEFT JOIN minedu.survey_participations sp 
         ON sp.school_id = s.id
         AND sp.completed_at IS NOT NULL
       ${whereClause}
-      GROUP BY s.id, s.name, s.cantidad_estudiantes
+      GROUP BY s.name, s.ugel_id
       ORDER BY s.name ASC
     `
 

@@ -32,6 +32,20 @@ export default function StudentsSection({ totals }: { totals: any }) {
     const accentRed = "#dc2626"
     const borderGray = "#e5e7eb"
 
+    const getGradeNumber = (grade: number | string) => {
+        const match = String(grade).match(/\d+/)
+        return match ? parseInt(match[0], 10) : null
+    }
+
+    const filterEvaluatedGrades = <T extends { grade: number | string }>(items: T[]) =>
+        items?.filter((item) => {
+            const gradeNumber = getGradeNumber(item.grade)
+            return gradeNumber !== null && gradeNumber >= 4 && gradeNumber <= 6
+        }) ?? []
+
+    const primariaGrados: GradoItem[] = filterEvaluatedGrades<GradoItem>(totals?.primaria?.grados ?? [])
+    const primariaSecciones: SeccionItem[] = filterEvaluatedGrades<SeccionItem>(totals?.primaria?.secciones ?? [])
+
     return (
         <Card className="border">
             <CardHeader>
@@ -112,7 +126,7 @@ export default function StudentsSection({ totals }: { totals: any }) {
                                     {/* Subniveles dentro de Grado */}
                                     {expandedSubRow === "Grado" && (
                                         <>
-                                            {totals.secundaria.grados?.map(( g: GradoItem) => (
+                                            {primariaGrados.map((g: GradoItem) => (
                                                 <tr
                                                     key={g.grade}
                                                     className="border-b bg-blue-50/50"
@@ -165,7 +179,7 @@ export default function StudentsSection({ totals }: { totals: any }) {
                                     {/* Subniveles dentro de Sección */}
                                     {expandedSubRow === "Seccion" && (
                                         <>
-                                            {totals.primaria.secciones?.map((s: SeccionItem) => (
+                                            {primariaSecciones.map((s: SeccionItem) => (
                                                 <tr
                                                     key={`${s.grade}-${s.section}`}
                                                     className="border-b bg-blue-50/50"
