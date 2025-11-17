@@ -63,7 +63,10 @@ export default function IncidentsSection({ data, total, page, limit, setPage }: 
                         <span className="flex items-center px-2">
                             {page} / {totalPages}
                         </span>
-                        <Button disabled={page === totalPages} onClick={() => setPage(page + 1)}>
+                        <Button
+                            disabled={page === totalPages || total <= 10}
+                            onClick={() => setPage(page + 1)}
+                        >
                             Siguiente
                         </Button>
                     </div>
