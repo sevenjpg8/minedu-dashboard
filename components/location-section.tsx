@@ -25,7 +25,7 @@ export default function LocationsSection({
     return (
         <Card className="border">
             <CardHeader>
-                <CardTitle className="text-xl">II. Total de Locales Educativos</CardTitle>
+                <CardTitle className="text-xl">II. Total de Colegios Educativos</CardTitle>
                 <CardDescription>Desglose por gestión</CardDescription>
             </CardHeader>
 
