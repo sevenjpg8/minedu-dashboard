@@ -64,6 +64,8 @@ export default function Header() {
           { href: "/dashboard/resultados", label: "Resultados" },
           { href: "/dashboard/tabla-progreso", label: "Progreso" },
           { href: "/dashboard/importar", label: "Importar Colegios" },
+          { href: "/dashboard/usuarios", label: "Usuarios" },
+          { href: "/dashboard/visor-logs", label: "Visor de logs" }
         ]
       : rol === "especialista"
       ? [

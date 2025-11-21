@@ -6,16 +6,15 @@ export async function GET() {
   try {
     const query = `
       SELECT 
+        completed_at::date AS fecha,
         TO_CHAR(completed_at, 'FMDay') AS day_name,
         s.gestion,
-        COUNT(*) AS total,
-        MIN(completed_at) AS min_date
+        COUNT(*) AS total
       FROM minedu.survey_participations sp
       JOIN minedu.school_new s ON sp.school_id = s.id
-      WHERE completed_at IS NOT NULL
-        AND completed_at >= NOW() - INTERVAL '7 days'
-      GROUP BY day_name, s.gestion
-      ORDER BY MIN(completed_at)
+      WHERE completed_at::date >= CURRENT_DATE - INTERVAL '6 days'
+      GROUP BY fecha, day_name, s.gestion
+      ORDER BY fecha;
     `;
 
     const result = await dbQuery(query)
