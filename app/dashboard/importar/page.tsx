@@ -3,11 +3,17 @@
 
 import { useState } from "react"
 import Papa from "papaparse"
-import { Upload } from "lucide-react"
+import { Upload, X } from "lucide-react"
+import { Alert, AlertDescription } from "@/components/ui/alert"
 
 export default function ImportarPage() {
   const [fileName, setFileName] = useState<string | null>(null)
   const [data, setData] = useState<any[]>([])
+  const [notification, setNotification] = useState<{
+    type: "success" | "error" | "info"
+    message: string
+  } | null>(null)
+
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
@@ -17,27 +23,39 @@ export default function ImportarPage() {
 
     // Validar extensión
     if (!file.name.endsWith(".csv")) {
-      alert("Por favor selecciona un archivo CSV.")
+      setNotification({
+        type: "error",
+        message: "Por favor selecciona un archivo CSV.",
+      })
       return
     }
 
     Papa.parse(file, {
-      header: true, // Usa la primera fila como encabezado
+      header: true,
       skipEmptyLines: true,
       complete: (result) => {
-        console.log("Datos importados:", result.data)
         setData(result.data)
+        setNotification({
+          type: "success",
+          message: "Archivo CSV leído correctamente.",
+        })
+
       },
-      error: (err) => {
-        console.error("Error al leer el CSV:", err)
-        alert("Ocurrió un error al procesar el archivo.")
+      error: () => {
+        setNotification({
+          type: "error",
+          message: "Ocurrió un error al procesar el archivo.",
+        })
       },
     })
   }
 
   const handleImport = async () => {
     if (data.length === 0) {
-      alert("No hay datos para importar.")
+      setNotification({
+        type: "error",
+        message: "No hay datos para importar.",
+      })
       return
     }
 
@@ -51,10 +69,16 @@ export default function ImportarPage() {
       const result = await res.json()
       if (!res.ok) throw new Error(result.error || "Error al importar")
 
-      alert(result.message)
+      setNotification({
+        type: "success",
+        message: result.message,
+      })
+
     } catch (error) {
-      console.error("Error al importar:", error)
-      alert("Ocurrió un error al importar los datos.")
+      setNotification({
+        type: "error",
+        message: "Ocurrió un error al importar los datos.",
+      })
     }
   }
 
@@ -62,7 +86,39 @@ export default function ImportarPage() {
   return (
     <div>
       <h1 className="text-2xl font-bold text-gray-800 mb-6">Importar Relación de Colegios</h1>
+      {notification && (
+        <div className="mb-6 flex gap-2">
+          <Alert
+            className={
+              notification.type === "success"
+                ? "border-green-500 bg-green-50"
+                : notification.type === "error"
+                  ? "border-red-500 bg-red-50"
+                  : "border-blue-500 bg-blue-50"
+            }
+          >
+            <AlertDescription
+              className={
+                notification.type === "success"
+                  ? "text-green-800"
+                  : notification.type === "error"
+                    ? "text-red-800"
+                    : "text-blue-800"
+              }
+            >
+              {notification.message}
+            </AlertDescription>
+          </Alert>
 
+          <button
+            onClick={() => setNotification(null)}
+            className="text-gray-500 hover:text-gray-700"
+            aria-label="Cerrar notificación"
+          >
+            <X size={18} />
+          </button>
+        </div>
+      )}
       <div className="bg-white rounded-lg shadow-sm p-8">
         <div className="mb-8">
           <h2 className="text-lg font-semibold text-gray-900 mb-4">Instrucciones:</h2>

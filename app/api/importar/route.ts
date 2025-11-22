@@ -20,7 +20,6 @@ export async function POST(req: Request) {
           anexo,
           education_level,
           name,
-          nivel_educativo,
           ugel, 
           departamento,
           provincia,
@@ -42,7 +41,7 @@ export async function POST(req: Request) {
         await dbQuery(
           `
           SELECT minedu.importar_colegio_y_encuesta(
-            $1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14
+            $1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13
           );
           `,
           [
@@ -50,7 +49,6 @@ export async function POST(req: Request) {
             anexo,
             education_level,
             name,
-            nivel_educativo,
             departamento,
             provincia,
             distrito,
