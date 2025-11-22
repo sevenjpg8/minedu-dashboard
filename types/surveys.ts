@@ -19,6 +19,7 @@ export interface Survey {
   status: "Activa" | "Inactiva"
   startDate: string
   endDate: string
+  level: "primaria" | "secundaria"
   questions?: Question[]
 }
 
@@ -27,5 +28,6 @@ export interface FormData {
   description: string
   startDate: string
   endDate: string
+  level: string
   active: boolean
 }

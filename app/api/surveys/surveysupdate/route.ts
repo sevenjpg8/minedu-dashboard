@@ -5,21 +5,39 @@ import { dbQuery } from "@/app/config/connection"
 export async function PUT(req: Request) {
   try {
     const data = await req.json()
-    const { id, title, description, startDate, endDate, active, questions } = data
+    const { id, title, description, startDate, endDate, active, level, questions } = data
 
     if (!id) {
       return NextResponse.json({ success: false, error: "ID de encuesta requerido" }, { status: 400 })
     }
 
+    // ✅ Validar nivel educativo
+    if (!level) {
+      return NextResponse.json(
+        { success: false, error: "El nivel educativo es requerido" },
+        { status: 400 }
+      )
+    }
+
+    const allowedLevels = ["primaria", "secundaria"]
+    if (!allowedLevels.includes(level)) {
+      return NextResponse.json(
+        { success: false, error: "Nivel educativo inválido" },
+        { status: 400 }
+      )
+    }
+
     const surveyId = Number(id)
 
+    // 1️⃣ Actualizar encuesta incluyendo LEVEL
     await dbQuery(
       `UPDATE minedu.surveys
-       SET title=$1, description=$2, starts_at=$3, ends_at=$4, is_active=$5, updated_at=NOW()
-       WHERE id=$6`,
-      [title, description, startDate, endDate, active ?? true, surveyId]
+       SET title=$1, description=$2, starts_at=$3, ends_at=$4, is_active=$5, level=$6, updated_at=NOW()
+       WHERE id=$7`,
+      [title, description, startDate, endDate, active ?? true, level, surveyId]
     )
 
+    // 2️⃣ Obtener preguntas existentes
     const existingQuestionsRes = await dbQuery(
       `SELECT id FROM minedu.questions WHERE survey_id=$1`,
       [surveyId]
@@ -29,20 +47,22 @@ export async function PUT(req: Request) {
     const newIds = questions.map((q: any) => q.id).filter((qid: any) => qid)
     const toDelete = existingQuestionIds.filter((qid: number) => !newIds.includes(qid))
 
+    // 3️⃣ Eliminar preguntas que ya no existen
     if (toDelete.length > 0) {
       await dbQuery(`DELETE FROM minedu.options WHERE question_id = ANY($1::int[])`, [toDelete])
       await dbQuery(`DELETE FROM minedu.questions WHERE id = ANY($1::int[])`, [toDelete])
-      console.log("🗑️ Preguntas y opciones eliminadas:", toDelete)
     }
 
-    const questionIdMap: Record<number, number> = {} // id temporal -> id real
+    const questionIdMap: Record<number, number> = {}
 
+    // 4️⃣ Mapear preguntas existentes
     for (const q of questions) {
       if (q.id && existingQuestionIds.includes(q.id)) {
         questionIdMap[q.id] = q.id
       }
     }
 
+    // 5️⃣ Insertar nuevas preguntas
     for (const q of questions) {
       if (!q.id || !existingQuestionIds.includes(q.id)) {
         const insertQuestionRes = await dbQuery(
@@ -56,6 +76,7 @@ export async function PUT(req: Request) {
       }
     }
 
+    // 6️⃣ Insertar/actualizar opciones
     for (const q of questions) {
       const questionId = questionIdMap[q.id]
       if (!q.answers || q.answers.length === 0) continue
@@ -77,6 +98,7 @@ export async function PUT(req: Request) {
     }
 
     return NextResponse.json({ success: true })
+
   } catch (error: any) {
     return NextResponse.json({ success: false, error: error.message }, { status: 500 })
   }

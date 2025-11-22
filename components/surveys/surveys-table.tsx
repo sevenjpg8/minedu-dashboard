@@ -16,6 +16,7 @@ export function SurveysTable({ surveys, loading, onEdit, onDelete }: SurveysTabl
         <thead className="bg-gray-50 border-b border-gray-200">
           <tr>
             <th className="px-6 py-3 text-left text-sm font-semibold text-gray-700">TITULO</th>
+            <th className="px-6 py-3 text-left text-sm font-semibold text-gray-700">NIVEL</th>
             <th className="px-6 py-3 text-left text-sm font-semibold text-gray-700">ESTADO</th>
             <th className="px-6 py-3 text-left text-sm font-semibold text-gray-700">FECHAS</th>
             <th className="px-6 py-3 text-left text-sm font-semibold text-gray-700">ACCIONES</th>
@@ -43,11 +44,16 @@ export function SurveysTable({ surveys, loading, onEdit, onDelete }: SurveysTabl
                     <p className="text-gray-600 text-sm">{survey.description}</p>
                   </div>
                 </td>
+
+                  {/* 👇 NUEVA COLUMNA NIVEL */}
+  <td className="px-6 py-4 text-gray-700 text-sm">
+    {survey.level || "—"}
+  </td>
+
                 <td className="px-6 py-4">
                   <span
-                    className={`inline-block ${
-                      survey.status === "Activa" ? "bg-green-100 text-green-800" : "bg-gray-200 text-gray-700"
-                    } text-xs font-semibold px-3 py-1 rounded-full`}
+                    className={`inline-block ${survey.status === "Activa" ? "bg-green-100 text-green-800" : "bg-gray-200 text-gray-700"
+                      } text-xs font-semibold px-3 py-1 rounded-full`}
                   >
                     {survey.status}
                   </span>

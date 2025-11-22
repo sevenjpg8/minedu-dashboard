@@ -9,7 +9,7 @@ interface SurveyFormModalProps {
   editingId: number | null
   formData: FormData
   questions: Question[]
-  onInputChange: (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => void
+  onInputChange: (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => void
   onAddQuestion: () => void
   onOpenQuestionsModal: () => void
   onOpenAnswersModal: (questionId: number) => void
@@ -112,6 +112,23 @@ export function SurveyFormModal({
               Activa
             </label>
           </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Nivel Educativo
+            </label>
+            <select
+              name="level"
+              value={formData.level}
+              onChange={onInputChange}
+              required
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+            >
+              <option value="primaria">Primaria</option>
+              <option value="secundaria">Secundaria</option>
+            </select>
+          </div>
+
 
           <div className="border-t border-gray-200 pt-4">
             <div className="flex items-center justify-between mb-4">

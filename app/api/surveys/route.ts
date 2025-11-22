@@ -12,7 +12,8 @@ export async function GET() {
         description,
         starts_at,
         ends_at,
-        is_active
+        is_active,
+        level            -- 👈 AÑADIDO AQUÍ
       FROM minedu.surveys
       ORDER BY id ASC
       `

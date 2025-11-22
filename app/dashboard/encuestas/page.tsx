@@ -34,6 +34,7 @@ export default function EncuestasPage() {
     description: "",
     startDate: "",
     endDate: "",
+    level: "primaria",
     active: false,
   })
 
@@ -80,7 +81,8 @@ export default function EncuestasPage() {
               status: s.is_active ? "Activa" : "Inactiva",
               startDate: s.starts_at?.split("T")[0] ?? "",
               endDate: s.ends_at?.split("T")[0] ?? "",
-            })),
+              level: s.level ?? "primaria",
+            }))
           )
         }
       } catch (err) {
@@ -119,7 +121,7 @@ export default function EncuestasPage() {
     setCurrentPage(1)
   }
 
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
     const { name, value, type } = e.target as HTMLInputElement
     setFormData((prev) => ({
       ...prev,
@@ -135,6 +137,7 @@ export default function EncuestasPage() {
         description: survey.description,
         startDate: survey.startDate,
         endDate: survey.endDate,
+        level: survey.level,  // ← aquí SÍ existe
         active: survey.status === "Activa",
       })
 
@@ -328,7 +331,7 @@ export default function EncuestasPage() {
   const handleCloseModal = () => {
     setShowModal(false)
     setEditingId(null)
-    setFormData({ title: "", description: "", startDate: "", endDate: "", active: false })
+    setFormData({ title: "", description: "", startDate: "", endDate: "", active: false, level: "primaria" })
     setQuestions([])
     setNewQuestion("")
     setNewQuestionDescription("")
@@ -346,6 +349,7 @@ export default function EncuestasPage() {
         startDate: formData.startDate,
         endDate: formData.endDate,
         active: formData.active,
+        level: formData.level, 
         questions: questions.map((q) => ({
           id: q.id,
           prefix: q.prefix ?? null,
@@ -386,6 +390,7 @@ export default function EncuestasPage() {
             description: "",
             startDate: "",
             endDate: "",
+            level: "",
             active: false,
           })
           setQuestions([])
@@ -401,6 +406,7 @@ export default function EncuestasPage() {
                     description: s.description ?? "",
                     status: s.is_active ? "Activa" : "Inactiva",
                     startDate: s.starts_at?.split("T")[0] ?? "",
+                    level: s.level ?? "primaria",
                     endDate: s.ends_at?.split("T")[0] ?? "",
                   })),
                 )

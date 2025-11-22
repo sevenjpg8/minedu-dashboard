@@ -5,26 +5,29 @@ import { dbQuery } from "@/app/config/connection"
 export async function POST(req: Request) {
   try {
     const data = await req.json()
-    const { title, description, startDate, endDate, active, questions } = data
+    const { title, description, startDate, endDate, active, level, questions } = data
 
     // 1️⃣ Crear la encuesta
     const insertSurveyQuery = `
       INSERT INTO minedu.surveys
-        (title, description, starts_at, ends_at, is_active, created_at, updated_at)
-      VALUES ($1, $2, $3, $4, $5, NOW(), NOW())
+        (title, description, starts_at, ends_at, is_active, level, created_at, updated_at)
+      VALUES ($1, $2, $3, $4, $5, $6, NOW(), NOW())
       RETURNING id
     `
+
     const surveyResult = await dbQuery(insertSurveyQuery, [
       title,
       description,
       startDate,
       endDate,
       active ?? true,
+      level // <-- primaria o secundaria
     ])
+
     const surveyId = surveyResult.rows[0].id
 
     // 2️⃣ Insertar preguntas y mapear ids temporales a ids reales
-    const questionIdMap: Record<number, number> = {} // key: id temporal del frontend, value: id real en DB
+    const questionIdMap: Record<number, number> = {}
 
     for (const q of questions) {
       const insertQuestionQuery = `
@@ -35,17 +38,18 @@ export async function POST(req: Request) {
       `
       const questionResult = await dbQuery(insertQuestionQuery, [
         surveyId,
-        1, // valor temporal para dimension_id
+        1,
         q.text,
         "multiple_choice",
         q.prefix,
         q.order ?? 0,
       ])
+
       const questionId = questionResult.rows[0].id
       questionIdMap[q.id] = questionId
     }
 
-    // 3️⃣ Insertar opciones con next_question_id
+    // 3️⃣ Insertar opciones
     for (const q of questions) {
       const questionId = questionIdMap[q.id]
 
