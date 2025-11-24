@@ -32,8 +32,8 @@ export async function POST(req: Request) {
     for (const q of questions) {
       const insertQuestionQuery = `
         INSERT INTO minedu.questions
-          (survey_id, dimension_id, text, type, prefix, "order", created_at, updated_at)
-        VALUES ($1, $2, $3, $4, $5, $6, NOW(), NOW())
+          (survey_id, dimension_id, text, type, prefix, "order")
+        VALUES ($1, $2, $3, $4, $5, $6)
         RETURNING id
       `
       const questionResult = await dbQuery(insertQuestionQuery, [
@@ -61,8 +61,8 @@ export async function POST(req: Request) {
               : null
 
           const insertOptionQuery = `
-            INSERT INTO minedu.options (question_id, text, created_at, updated_at, next_question_id)
-            VALUES ($1, $2, NOW(), NOW(), $3)
+            INSERT INTO minedu.options (question_id, text, next_question_id)
+            VALUES ($1, $2, $3)
           `
           await dbQuery(insertOptionQuery, [questionId, a.text, nextQuestionId])
         }

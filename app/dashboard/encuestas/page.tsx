@@ -349,7 +349,7 @@ export default function EncuestasPage() {
         startDate: formData.startDate,
         endDate: formData.endDate,
         active: formData.active,
-        level: formData.level, 
+        level: formData.level,
         questions: questions.map((q) => ({
           id: q.id,
           prefix: q.prefix ?? null,
@@ -452,6 +452,10 @@ export default function EncuestasPage() {
         if (currentPage > newTotalPages) setCurrentPage(newTotalPages)
 
         try {
+
+          // ❗ AQUI ACTIVA EL LOADING
+          setIsSubmitting(true)
+
           const res = await fetch("/api/surveys/surveysdelete", {
             method: "DELETE",
             headers: { "Content-Type": "application/json" },
@@ -481,6 +485,8 @@ export default function EncuestasPage() {
             message: "No se pudo eliminar la encuesta. Por favor, inténtalo de nuevo.",
             type: "error",
           })
+        } finally {
+          setIsSubmitting(false) // ← Ocultar loading dialog
         }
         setConfirmDialog({ ...confirmDialog, isOpen: false })
       },

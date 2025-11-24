@@ -66,8 +66,8 @@ export async function PUT(req: Request) {
     for (const q of questions) {
       if (!q.id || !existingQuestionIds.includes(q.id)) {
         const insertQuestionRes = await dbQuery(
-          `INSERT INTO minedu.questions (survey_id, dimension_id, text, prefix, type, created_at, updated_at)
-           VALUES ($1, $2, $3, $4, 'multiple_choice', NOW(), NOW())
+          `INSERT INTO minedu.questions (survey_id, dimension_id, text, prefix, type)
+           VALUES ($1, $2, $3, $4, 'multiple_choice')
            RETURNING id`,
           [surveyId, 1, q.text, q.prefix ?? null]
         )
@@ -90,8 +90,8 @@ export async function PUT(req: Request) {
             : null
 
         await dbQuery(
-          `INSERT INTO minedu.options (question_id, text, created_at, updated_at, next_question_id)
-           VALUES ($1, $2, NOW(), NOW(), $3)`,
+          `INSERT INTO minedu.options (question_id, text, next_question_id)
+           VALUES ($1, $2, $3)`,
           [questionId, a.text, nextQuestionId]
         )
       }

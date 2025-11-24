@@ -45,10 +45,10 @@ export function SurveysTable({ surveys, loading, onEdit, onDelete }: SurveysTabl
                   </div>
                 </td>
 
-                  {/* 👇 NUEVA COLUMNA NIVEL */}
-  <td className="px-6 py-4 text-gray-700 text-sm">
-    {survey.level || "—"}
-  </td>
+                {/* 👇 NUEVA COLUMNA NIVEL */}
+                <td className="px-6 py-4 text-gray-700 text-sm">
+                  {survey.level || "—"}
+                </td>
 
                 <td className="px-6 py-4">
                   <span
