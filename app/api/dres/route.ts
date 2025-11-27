@@ -4,24 +4,42 @@ import { dbQuery } from "@/app/config/connection"
 export async function GET() {
   try {
     const sql = `
-      WITH aggregated_schools AS (
+      WITH ea_totals AS (
         SELECT
-          COALESCE(NULLIF(TRIM(s.cod_mod::text), ''), s.id::text) AS modular_code,
+          ea.school_id,
+          LOWER(regexp_replace(regexp_replace(TRIM(COALESCE(ea.nombre_colegio, '')), '\\s+', ' ', 'g'), '[^a-z0-9 ]', '', 'g')) AS name_key,
+          SUM(COALESCE(ea.cantidad_estudiantes, 0)) AS total_students
+        FROM minedu.encuesta_acceso ea
+        GROUP BY ea.school_id, name_key
+      ),
+      school_base AS (
+        SELECT
+          s.id,
+          s.id_unico,
           s.ugel_id,
-          SUM(COALESCE(s.cantidad_estudiantes, 0)) AS total_students
+          LOWER(regexp_replace(regexp_replace(TRIM(COALESCE(s.name, '')), '\\s+', ' ', 'g'), '[^a-z0-9 ]', '', 'g')) AS name_key,
+          COALESCE(ea.total_students, 0) AS cantidad_estudiantes
         FROM minedu.school_new s
-        GROUP BY modular_code, s.ugel_id
+        LEFT JOIN ea_totals ea ON ea.school_id = s.id
+      ),
+      aggregated_schools AS (
+        SELECT
+          ugel_id,
+          name_key,
+          SUM(cantidad_estudiantes) AS total_students
+        FROM school_base
+        GROUP BY ugel_id, name_key
       ),
       completed AS (
         SELECT
-          COALESCE(NULLIF(TRIM(s.cod_mod::text), ''), s.id::text) AS modular_code,
-          s.ugel_id,
+          sb.ugel_id,
+          sb.name_key,
           COUNT(sp.id) AS completed_students
-        FROM minedu.school_new s
+        FROM school_base sb
         LEFT JOIN minedu.survey_participations sp
-          ON sp.school_id = s.id
+          ON sp.school_id = sb.id
           AND sp.completed_at IS NOT NULL
-        GROUP BY modular_code, s.ugel_id
+        GROUP BY sb.ugel_id, sb.name_key
       )
       SELECT 
         d.id,
@@ -33,7 +51,7 @@ export async function GET() {
       LEFT JOIN aggregated_schools agg ON agg.ugel_id = u.id
       LEFT JOIN completed comp
         ON comp.ugel_id = u.id
-        AND comp.modular_code = agg.modular_code
+        AND comp.name_key = agg.name_key
       GROUP BY d.id, d.name
       ORDER BY d.name ASC
     `
