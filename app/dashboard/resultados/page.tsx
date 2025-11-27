@@ -184,10 +184,17 @@ export default function ReportesPage() {
     const blob = await res.blob()
     const downloadUrl = window.URL.createObjectURL(blob)
 
-    const a = document.createElement("a")
-    a.href = downloadUrl
-    a.download = "reporte.csv"
-    a.click()
+    let fileName = "reporte";
+    if (filters.encuesta) fileName += `_encuesta_${filters.encuesta}`;
+    if (filters.dre) fileName += `_dre_${filters.dre}`;
+    if (filters.ugel) fileName += `_ugel_${filters.ugel}`;
+    if (filters.colegio) fileName += `_colegio_${filters.colegio}`;
+    fileName += ".csv";
+
+    const a = document.createElement("a");
+    a.href = downloadUrl;
+    a.download = fileName;
+    a.click();
 
     window.URL.revokeObjectURL(downloadUrl)
   }

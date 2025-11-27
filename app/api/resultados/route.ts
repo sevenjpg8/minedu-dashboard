@@ -6,6 +6,7 @@ interface AnswerRow {
   id: string;
   survey_participation_id: string;
   question_id: number | null;
+  option_id: number | null;
   question_text: string | null;
   option_text: string | null;
   respuesta_count: number;
@@ -78,6 +79,8 @@ export async function GET(req: Request) {
 
     let answersQuery = `
       SELECT 
+        a.question_id,
+        a.option_id,
         q.text AS question_text,
         o.text AS option_text,
         COUNT(*) AS respuesta_count
@@ -85,9 +88,10 @@ export async function GET(req: Request) {
       LEFT JOIN minedu.questions q ON q.id = a.question_id
       LEFT JOIN minedu.options o ON o.id = a.option_id
       WHERE a.survey_participation_id = ANY($1::uuid[])
-      GROUP BY q.text, o.text
-      ORDER BY q.text
+      GROUP BY a.question_id, a.option_id, q.text, o.text
+      ORDER BY a.question_id, a.option_id
     `;
+
 
     const answersRes = await dbQuery(answersQuery, [participationIds]);
 
@@ -110,19 +114,25 @@ export async function GET(req: Request) {
     }
 
 
-    const charts = Object.entries(agrupado).map(([pregunta, opciones]) => {
+    const charts = Object.entries(agrupado)
+    .map(([pregunta, opciones]) => {
       const firstRow = data.find((r) => r.question_text === pregunta);
       return {
-        id: firstRow?.question_id ?? 0,
+        id: firstRow?.question_id ?? 0,  // ahora sí tiene valor real
         question: pregunta,
         data: Object.entries(opciones)
-          .sort(([a], [b]) => a.localeCompare(b)) // ordenar por nombre de opción
+          .sort(([aName], [bName]) => {
+            const optionA = data.find(r => r.question_text === pregunta && r.option_text === aName)?.option_id ?? 0;
+            const optionB = data.find(r => r.question_text === pregunta && r.option_text === bName)?.option_id ?? 0;
+            return optionA - optionB;
+          })
           .map(([name, count]) => ({
             name,
             "# de Respuestas": count,
           })),
       };
-    });
+    })
+    .sort((a, b) => a.id - b.id);
 
     return NextResponse.json({ success: true, charts });
 
