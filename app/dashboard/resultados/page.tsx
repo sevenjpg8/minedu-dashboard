@@ -19,6 +19,36 @@ const ChartCard = ({ title, data }: { title: string; data: any[] }) => (
   </div>
 )
 
+function getExportEndpoint(filters: any) {
+  const encuesta = filters.encuesta
+  const dre = filters.dre
+  const ugel = filters.ugel
+  const colegio = filters.colegio
+
+  // Caso 1 → Solo encuesta
+  if (encuesta && !dre && !ugel && !colegio) {
+    return `/api/resultados/export/encuesta/${encuesta}`
+  }
+
+  // Caso 2 → Encuesta + DRE
+  if (encuesta && dre && !ugel && !colegio) {
+    return `/api/resultados/export/dre/${encuesta}?dre=${dre}`
+  }
+
+  // Caso 3 → Encuesta + DRE + UGEL
+  if (encuesta && dre && ugel && !colegio) {
+    return `/api/resultados/export/ugel/${encuesta}?dre=${dre}&ugel=${ugel}`
+  }
+
+  // Caso 4 → Encuesta + DRE + UGEL + Colegio
+  if (encuesta && dre && ugel && colegio) {
+    return `/api/resultados/export/colegio/${colegio}?encuesta=${encuesta}&dre=${dre}&ugel=${ugel}`;
+  }
+
+  // Fallback (no debería pasar)
+  return ""
+}
+
 export default function ReportesPage() {
   const [filters, setFilters] = useState({
     encuesta: "",
@@ -35,9 +65,26 @@ export default function ReportesPage() {
   const [ugels, setUgels] = useState<any[]>([])
   const [schools, setSchools] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
+  const [charts, setCharts] = useState<any[]>([]);
 
   const handleFilterChange = (key: string, value: string) => {
     setFilters((prev) => ({ ...prev, [key]: value }))
+  }
+
+  const handleSelectEncuesta = (encuestaId: string) => {
+    const survey = surveys.find((s) => s.id === encuestaId)
+
+    setFilters((prev) => ({
+      ...prev,
+      encuesta: encuestaId,
+      nivelEducativo: survey?.level ? survey.level.toLowerCase() : "",
+      colegio: "",
+      colegioNombre: "",
+      grado: ""
+    }))
+
+    setSchools([])
+    setFilteredSchools([])
   }
 
   const handleClearFilters = () => {
@@ -82,8 +129,6 @@ export default function ReportesPage() {
       })
   }, [filters.dre])
 
-
-  // Cargar colegios al seleccionar UGEL
   useEffect(() => {
     if (!filters.ugel) {
       setSchools([])
@@ -101,7 +146,7 @@ export default function ReportesPage() {
     setFilteredSchools([])
 
     if (value !== filters.colegioNombre) {
-      setFilters((prev) => ({ ...prev, colegio: "", nivelEducativo: "", grado: "" }))
+      setFilters((prev) => ({ ...prev, colegio: "", grado: "" }))
     }
 
     if (!filters.ugel || value.length < 3) return // espera que escriba al menos 3 letras
@@ -122,6 +167,31 @@ export default function ReportesPage() {
     return ""
   }
 
+  const handleDownloadCSV = async () => {
+    const endpoint = getExportEndpoint(filters)
+
+    if (!endpoint) {
+      alert("Seleccione al menos una encuesta")
+      return
+    }
+
+    const res = await fetch(endpoint)
+    if (!res.ok) {
+      alert("No se pudo generar el CSV")
+      return
+    }
+
+    const blob = await res.blob()
+    const downloadUrl = window.URL.createObjectURL(blob)
+
+    const a = document.createElement("a")
+    a.href = downloadUrl
+    a.download = "reporte.csv"
+    a.click()
+
+    window.URL.revokeObjectURL(downloadUrl)
+  }
+
 
   const handleSelectSchool = (school: any) => {
     setFilteredSchools([])
@@ -129,7 +199,6 @@ export default function ReportesPage() {
       ...prev,
       colegio: school.id,
       colegioNombre: school.name,
-      nivelEducativo: normalizarNivel(school.nivel_educativo),
       grado: "",
     }))
   }
@@ -143,17 +212,25 @@ export default function ReportesPage() {
         ? ["1", "2", "3", "4", "5"]
         : [] // 🔒 si es inicial u otro, no hay grados disponibles
 
-
-  const [charts, setCharts] = useState<any[]>([]);
-
   useEffect(() => {
     const fetchCharts = async () => {
       if (!filters.encuesta) return;
       setLoading(true);
 
-      const params = new URLSearchParams(
-        Object.entries(filters).filter(([_, v]) => v !== "")
-      );
+      const params = new URLSearchParams();
+
+      params.append("encuesta", filters.encuesta);
+
+      if (filters.dre) params.append("dre", filters.dre);
+
+      // 👉 SI HAY COLEGIO seleccionamos SOLO COLEGIO (no UGEL)
+      if (filters.colegio) {
+        params.append("colegio", filters.colegio);
+        if (filters.grado) params.append("grado", filters.grado);
+      } else {
+        // 👉 SI NO HAY COLEGIO: filtramos por UGEL
+        if (filters.ugel) params.append("ugel", filters.ugel);
+      }
 
       const res = await fetch(`/api/resultados?${params.toString()}`);
       const data = await res.json();
@@ -180,7 +257,6 @@ export default function ReportesPage() {
     filters.dre,
     filters.ugel,
     filters.colegio,
-    filters.nivelEducativo,
     filters.grado
   ]);
 
@@ -195,7 +271,7 @@ export default function ReportesPage() {
             <label className="block text-sm font-medium text-gray-700 mb-2">Encuesta</label>
             <select
               value={filters.encuesta}
-              onChange={(e) => handleFilterChange("encuesta", e.target.value)}
+              onChange={(e) => handleSelectEncuesta(e.target.value)}
               className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
             >
               <option value="">-- Seleccione una encuesta --</option>
@@ -304,6 +380,13 @@ export default function ReportesPage() {
             className="bg-gray-700 hover:bg-gray-800 text-white font-medium py-2 px-6 rounded-lg transition-colors"
           >
             Limpiar Filtros
+          </button> 
+          <button
+            onClick={handleDownloadCSV}
+            disabled={!filters.encuesta}
+            className="bg-green-600 hover:bg-green-700 disabled:bg-gray-400 text-white font-medium py-2 px-6 rounded-lg transition-colors"
+          >
+            Exportar CSV
           </button>
         </div>
       </div>

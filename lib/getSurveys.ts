@@ -15,9 +15,9 @@ export async function getSurveys(): Promise<Survey[]> {
   try {
     const res = await dbQuery(
       `
-      SELECT id, title, description, unique_link_slug, starts_at, ends_at, is_active
-      FROM minedu.surveys
-      ORDER BY id ASC
+        SELECT id, title, description, unique_link_slug, starts_at, ends_at, is_active
+        FROM minedu.surveys
+        ORDER BY id ASC
       `
     )
 

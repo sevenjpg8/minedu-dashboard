@@ -8,6 +8,7 @@ interface AnswerRow {
   question_id: number | null;
   question_text: string | null;
   option_text: string | null;
+  respuesta_count: number;
 }
 
 export async function GET(req: Request) {
@@ -17,8 +18,8 @@ export async function GET(req: Request) {
     const dreId = searchParams.get("dre");
     const ugelId = searchParams.get("ugel");
     const schoolId = searchParams.get("colegio");
-    const nivelEducativo = searchParams.get("nivelEducativo");
     const grado = searchParams.get("grado");
+    const nivelEducativo = searchParams.get("nivelEducativo");
 
     if (!surveyId) {
       return NextResponse.json(
@@ -59,11 +60,6 @@ export async function GET(req: Request) {
       params.push(schoolId);
     }
 
-    if (nivelEducativo) {
-      query += ` AND LOWER(education_level) = LOWER($${index++})`;
-      params.push(nivelEducativo);
-    }
-
     if (grado) {
       query += ` AND grade = $${index++}`;
       params.push(grado);
@@ -80,21 +76,20 @@ export async function GET(req: Request) {
 
     const participationIds = participations.map((p) => String(p.id));
 
-    const answersRes = await dbQuery(
-      `
-      SELECT
-        a.id,
-        a.survey_participation_id,
-        a.question_id,
+    let answersQuery = `
+      SELECT 
         q.text AS question_text,
-        o.text AS option_text
+        o.text AS option_text,
+        COUNT(*) AS respuesta_count
       FROM minedu.answers a
       LEFT JOIN minedu.questions q ON q.id = a.question_id
       LEFT JOIN minedu.options o ON o.id = a.option_id
       WHERE a.survey_participation_id = ANY($1::uuid[])
-      `,
-      [participationIds]
-    );
+      GROUP BY q.text, o.text
+      ORDER BY q.text
+    `;
+
+    const answersRes = await dbQuery(answersQuery, [participationIds]);
 
     const data: AnswerRow[] = answersRes.rows;
 
@@ -109,20 +104,23 @@ export async function GET(req: Request) {
       const opcion = row.option_text || "Sin opción";
 
       if (!agrupado[pregunta]) agrupado[pregunta] = {};
-      if (!agrupado[pregunta][opcion]) agrupado[pregunta][opcion] = 0;
 
-      agrupado[pregunta][opcion]++;
+      // Usamos el conteo real que nos da SQL
+      agrupado[pregunta][opcion] = Number(row.respuesta_count || 0);
     }
+
 
     const charts = Object.entries(agrupado).map(([pregunta, opciones]) => {
       const firstRow = data.find((r) => r.question_text === pregunta);
       return {
         id: firstRow?.question_id ?? 0,
         question: pregunta,
-        data: Object.entries(opciones).map(([name, count]) => ({
-          name,
-          "# de Respuestas": count,
-        })),
+        data: Object.entries(opciones)
+          .sort(([a], [b]) => a.localeCompare(b)) // ordenar por nombre de opción
+          .map(([name, count]) => ({
+            name,
+            "# de Respuestas": count,
+          })),
       };
     });
 
