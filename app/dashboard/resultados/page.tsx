@@ -28,6 +28,7 @@ interface RowItem {
 }
 
 interface Filters {
+  encuesta?: string;
   dre?: string;
   ugel?: string;
   colegio?: string;
@@ -337,6 +338,13 @@ export default function ReportesPage() {
 
   const handleExportPDFDirect = async () => {
     if (!charts || charts.length === 0) return;
+  
+    let fileName = "reporte";
+    if (pdfFilters.encuesta) fileName += `_encuesta_${pdfFilters.encuesta}`;
+    if (pdfFilters.dre) fileName += `_dre_${pdfFilters.dre}`;
+    if (pdfFilters.ugel) fileName += `_ugel_${pdfFilters.ugel}`;
+    if (pdfFilters.colegio) fileName += `_colegio_${pdfFilters.colegio}`;
+    fileName += ".pdf";
 
     // Crear el documento PDF
     const doc = <ReportePDF rows={pdfRows} filters={pdfFilters} />;
@@ -350,7 +358,7 @@ export default function ReportesPage() {
     const url = window.URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = "reporte.pdf";
+    a.download = fileName;
     a.click();
     window.URL.revokeObjectURL(url);
   };
