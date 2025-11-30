@@ -1,6 +1,5 @@
 "use client"
 
-import DownloadPDF from "@/components/pdf/DownloadPDF";
 import ReportePDF from "@/components/pdf/ReportePDF";
 import { PDFDownloadLink } from "@react-pdf/renderer";
 import { useEffect, useMemo, useState } from "react"
@@ -85,6 +84,7 @@ export default function ReportesPage() {
   const [charts, setCharts] = useState<any[]>([]);
   const [pdfRows, setPdfRows] = useState<RowItem[]>([]);
   const [pdfFilters, setPdfFilters] = useState<Filters>({});
+  const [pdfData, setPdfData] = useState<{ rows: RowItem[]; filters: Filters } | null>(null);
 
   const handleFilterChange = (key: string, value: string) => {
     setFilters((prev) => ({ ...prev, [key]: value }))
@@ -335,6 +335,14 @@ export default function ReportesPage() {
     });
   }, [charts, filters, dres, ugels, schools, surveys]);
 
+  const handleExportPDF = () => {
+    setPdfData({
+      rows: pdfRows,
+      filters: pdfFilters,
+    });
+  };
+
+
   return (
     <div>
       <h1 className="text-2xl font-bold text-gray-800 mb-6">Reporte de Opciones Múltiples</h1>
@@ -463,8 +471,23 @@ export default function ReportesPage() {
           >
             Exportar CSV
           </button>
-          {charts && charts.length > 0 && (
-            <DownloadPDF rows={pdfRows} filters={pdfFilters} />
+          <button
+            onClick={handleExportPDF}
+            disabled={!charts || charts.length === 0}
+            className="bg-red-600 hover:bg-red-700 disabled:bg-gray-400 text-white font-medium py-2 px-6 rounded-lg transition-colors cursor-pointer"
+          >
+            Exportar PDF
+          </button>
+
+          {pdfData && (
+            <PDFDownloadLink
+              document={<ReportePDF rows={pdfData.rows} filters={pdfData.filters} />}
+              fileName="reporte.pdf"
+            >
+              {({ loading }) => (
+                <span>{loading ? "Generando..." : "Descargar PDF"}</span>
+              )}
+            </PDFDownloadLink>
           )}
         </div>
       </div>
