@@ -18,18 +18,38 @@ interface Filters {
 const styles = StyleSheet.create({
   page: { padding: 20, fontSize: 10 },
 
-  // contenedor del banner alineado a la derecha
-  bannerWrapper: {
+  // fila con banner + texto
+  header: {
     flexDirection: "row",
-    justifyContent: "flex-end",
-    marginBottom: 10,
-  },
-  banner: {
-    width: 320,      // antes 400–420, ahora más pequeño
-    // sin height -> mantiene proporción
+    alignItems: "flex-start",
+    marginBottom: 12,
   },
 
-  title: { fontSize: 16, marginBottom: 10 },
+  // banner a la izquierda
+  banner: {
+    width: 260,        // ajústalo: 220–280 según te guste
+    marginRight: 12,
+    // sin height para mantener proporción
+  },
+
+  // bloque de texto a la derecha
+  headerText: {
+    flex: 1,
+  },
+
+  title: {
+    fontSize: 16,
+    marginBottom: 6,
+  },
+
+  filtersBox: {
+    marginBottom: 4,
+  },
+  filterItem: {
+    fontSize: 11,
+    marginBottom: 2,
+  },
+
   headerRow: {
     flexDirection: "row",
     borderBottomWidth: 1,
@@ -49,13 +69,6 @@ const styles = StyleSheet.create({
   cell: {
     flex: 1,
   },
-  filtersBox: {
-    marginBottom: 12,
-  },
-  filterItem: {
-    fontSize: 11,
-    marginBottom: 2,
-  },
 });
 
 
@@ -70,14 +83,16 @@ export default function ReportePDF({
   filters: Filters;
 }) {
   return (
-    <Document>
-      <Page size="A4" orientation="landscape" style={styles.page}>
+<Document>
+  <Page size="A4" orientation="landscape" style={styles.page}>
+    {/* HEADER: texto a la izquierda, banner a la derecha */}
+    <View style={styles.header}>
+      {/* Izquierda: título + filtros */}
+      <View style={styles.headerText}>
+        <Text style={styles.title}>
+          Reporte de Resultados de "Tu Voz Nos Importa"
+        </Text>
 
-         {/* BANNER ARRIBA */}
-          <View style={styles.bannerWrapper}>
-       <Image src="/images/banner-minedu.png" style={styles.banner} />
-       </View>
-        <Text style={styles.title}>Reporte de Resultados de "Tu Voz Nos Importa"</Text>
         <View style={styles.filtersBox}>
           {filters?.dre && (
             <Text style={styles.filterItem}>DRE: {filters.dre}</Text>
@@ -91,26 +106,36 @@ export default function ReportePDF({
             </Text>
           )}
           {filters?.tipoEncuesta && (
-            <Text style={styles.filterItem}>Tipo de Encuesta: {filters.tipoEncuesta}</Text>
+            <Text style={styles.filterItem}>
+              Tipo de Encuesta: {filters.tipoEncuesta}
+            </Text>
           )}
         </View>
+      </View>
 
-        <View>
-          <View style={styles.headerRow}>
-            <Text style={styles.cellHeader}>Pregunta</Text>
-            <Text style={styles.cellHeader}>Opción</Text>
-            <Text style={styles.cellHeader}>Cantidad</Text>
-          </View>
+      {/* Derecha: banner */}
+      <Image src="/images/banner-minedu.png" style={styles.banner} />
+    </View>
 
-          {rows.map((r, i) => (
-            <View key={i} style={styles.row}>
-              <Text style={styles.cell}>{r.question_text}</Text>
-              <Text style={styles.cell}>{r.option_text}</Text>
-              <Text style={styles.cell}>{String(r.cantidad)}</Text>
-            </View>
-          ))}
+    {/* TABLA */}
+    <View>
+      <View style={styles.headerRow}>
+        <Text style={styles.cellHeader}>Pregunta</Text>
+        <Text style={styles.cellHeader}>Opción</Text>
+        <Text style={styles.cellHeader}>Cantidad</Text>
+      </View>
+
+      {rows.map((r, i) => (
+        <View key={i} style={styles.row}>
+          <Text style={styles.cell}>{r.question_text}</Text>
+          <Text style={styles.cell}>{r.option_text}</Text>
+          <Text style={styles.cell}>{String(r.cantidad)}</Text>
         </View>
-      </Page>
-    </Document>
+      ))}
+    </View>
+  </Page>
+</Document>
+
+
   )
 }
