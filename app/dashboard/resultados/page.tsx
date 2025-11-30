@@ -469,7 +469,7 @@ export default function ReportesPage() {
           </div>
         </div>
 
-        <div className="flex justify-end">
+        <div className="flex justify-end space-x-4">
           <button
             onClick={handleClearFilters}
             className="bg-gray-700 hover:bg-gray-800 text-white font-medium py-2 px-6 rounded-lg transition-colors cursor-pointer"
