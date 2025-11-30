@@ -1,6 +1,9 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import DownloadPDF from "@/components/pdf/DownloadPDF";
+import ReportePDF from "@/components/pdf/ReportePDF";
+import { PDFDownloadLink } from "@react-pdf/renderer";
+import { useEffect, useMemo, useState } from "react"
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from "recharts"
 
 const ChartCard = ({ title, data }: { title: string; data: any[] }) => (
@@ -18,6 +21,20 @@ const ChartCard = ({ title, data }: { title: string; data: any[] }) => (
     </ResponsiveContainer>
   </div>
 )
+
+interface RowItem {
+  question_text: string
+  option_text: string
+  cantidad: number
+}
+
+interface Filters {
+  dre?: string;
+  ugel?: string;
+  colegio?: string;
+  tipoEncuesta?: string;
+}
+
 
 function getExportEndpoint(filters: any) {
   const encuesta = filters.encuesta
@@ -66,6 +83,8 @@ export default function ReportesPage() {
   const [schools, setSchools] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [charts, setCharts] = useState<any[]>([]);
+  const [pdfRows, setPdfRows] = useState<RowItem[]>([]);
+  const [pdfFilters, setPdfFilters] = useState<Filters>({});
 
   const handleFilterChange = (key: string, value: string) => {
     setFilters((prev) => ({ ...prev, [key]: value }))
@@ -145,15 +164,25 @@ export default function ReportesPage() {
     handleFilterChange("colegioNombre", value)
     setFilteredSchools([])
 
-    if (value !== filters.colegioNombre) {
-      setFilters((prev) => ({ ...prev, colegio: "", grado: "" }))
+    if (value.trim() === "") {
+      setFilters(prev => ({
+        ...prev,
+        colegio: "",
+        grado: ""
+      }))
+      return
     }
 
-    if (!filters.ugel || value.length < 3) return // espera que escriba al menos 3 letras
+    if (!filters.ugel || value.length < 3) return
 
-    const res = await fetch(`/api/schoolsSearch?ugelId=${filters.ugel}&query=${value}`)
-    const data = await res.json()
-    setFilteredSchools(data)
+    try {
+      const res = await fetch(`/api/schoolsSearch?ugelId=${filters.ugel}&query=${value}`)
+      const data = await res.json()
+
+      setFilteredSchools(Array.isArray(data) ? data : [])
+    } catch (error) {
+      console.error("Error buscando colegios:", error)
+    }
   }
 
   function normalizarNivel(nivel: string): string {
@@ -230,12 +259,13 @@ export default function ReportesPage() {
 
       if (filters.dre) params.append("dre", filters.dre);
 
-      // 👉 SI HAY COLEGIO seleccionamos SOLO COLEGIO (no UGEL)
+      // 👉 Si hay colegio, también enviar UGEL
       if (filters.colegio) {
         params.append("colegio", filters.colegio);
+        if (filters.ugel) params.append("ugel", filters.ugel);
         if (filters.grado) params.append("grado", filters.grado);
       } else {
-        // 👉 SI NO HAY COLEGIO: filtramos por UGEL
+        // 👉 Si NO hay colegio, usar ugel normal
         if (filters.ugel) params.append("ugel", filters.ugel);
       }
 
@@ -266,6 +296,44 @@ export default function ReportesPage() {
     filters.colegio,
     filters.grado
   ]);
+
+  function convertChartsToRows(charts: any[]): RowItem[] {
+    const rows: RowItem[] = [];
+
+    charts.forEach(chart => {
+      if (!chart.data || !Array.isArray(chart.data) || chart.data.length === 0) {
+        // Si no hay datos, puedes agregar un row con "Sin respuesta" opcional
+        rows.push({
+          question_text: String(chart.question ?? ""),
+          option_text: "Sin respuestas",
+          cantidad: 0
+        });
+        return;
+      }
+
+      chart.data.forEach((item: any) => {
+        rows.push({
+          question_text: String(chart.question ?? ""),
+          option_text: String(item?.name ?? "Sin respuesta"),
+          cantidad: Number(item?.["# de Respuestas"] ?? 0)
+        });
+      });
+    });
+
+    return rows;
+  }
+
+  useEffect(() => {
+    if (charts.length === 0) return;
+
+    setPdfRows(convertChartsToRows(charts));
+    setPdfFilters({
+      dre: dres.find(d => d.id === filters.dre)?.name || "",
+      ugel: ugels.find(u => u.id === filters.ugel)?.name || "",
+      colegio: schools.find(s => s.id === filters.colegio)?.name || "",
+      tipoEncuesta: surveys.find(s => s.id === filters.encuesta)?.title || ""
+    });
+  }, [charts, filters, dres, ugels, schools, surveys]);
 
   return (
     <div>
@@ -368,7 +436,7 @@ export default function ReportesPage() {
             <select
               value={filters.grado}
               onChange={(e) => handleFilterChange("grado", e.target.value)}
-              disabled={!filters.colegio || level.toLowerCase() === "inicial"} // 🔒 bloqueado si no hay colegio o si el nivel es inicial
+              disabled={!filters.colegio || level.toLowerCase() === "inicial"} 
               className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100"
             >
               <option value="">-- Todos los Grados --</option>
@@ -384,17 +452,20 @@ export default function ReportesPage() {
         <div className="flex justify-end">
           <button
             onClick={handleClearFilters}
-            className="bg-gray-700 hover:bg-gray-800 text-white font-medium py-2 px-6 rounded-lg transition-colors"
+            className="bg-gray-700 hover:bg-gray-800 text-white font-medium py-2 px-6 rounded-lg transition-colors cursor-pointer"
           >
             Limpiar Filtros
           </button> 
           <button
             onClick={handleDownloadCSV}
             disabled={!filters.encuesta}
-            className="bg-green-600 hover:bg-green-700 disabled:bg-gray-400 text-white font-medium py-2 px-6 rounded-lg transition-colors"
+            className="bg-green-600 hover:bg-green-700 disabled:bg-gray-400 text-white font-medium py-2 px-6 rounded-lg transition-colors cursor-pointer"
           >
             Exportar CSV
           </button>
+          {charts && charts.length > 0 && (
+            <DownloadPDF rows={pdfRows} filters={pdfFilters} />
+          )}
         </div>
       </div>
 
