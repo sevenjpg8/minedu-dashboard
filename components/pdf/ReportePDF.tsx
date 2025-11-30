@@ -1,5 +1,6 @@
 // components/pdf/ReportePDF.tsx
-import { Page, Text, View, Document, StyleSheet } from "@react-pdf/renderer"
+import { Page, Text, View, Document, StyleSheet, Image } from "@react-pdf/renderer"
+
 
 interface RowData {
   question_text: string
@@ -16,18 +17,30 @@ interface Filters {
 
 const styles = StyleSheet.create({
   page: { padding: 20, fontSize: 10 },
+
+  // contenedor del banner alineado a la derecha
+  bannerWrapper: {
+    flexDirection: "row",
+    justifyContent: "flex-end",
+    marginBottom: 10,
+  },
+  banner: {
+    width: 320,      // antes 400–420, ahora más pequeño
+    // sin height -> mantiene proporción
+  },
+
   title: { fontSize: 16, marginBottom: 10 },
   headerRow: {
     flexDirection: "row",
     borderBottomWidth: 1,
     borderBottomColor: "#ccc",
-    paddingVertical: 4
+    paddingVertical: 4,
   },
   row: {
     flexDirection: "row",
     borderBottomWidth: 1,
     borderBottomColor: "#eee",
-    paddingVertical: 4
+    paddingVertical: 4,
   },
   cellHeader: {
     flex: 1,
@@ -37,13 +50,17 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   filtersBox: {
-    marginBottom: 12
+    marginBottom: 12,
   },
   filterItem: {
     fontSize: 11,
-    marginBottom: 2
-  }
-})
+    marginBottom: 2,
+  },
+});
+
+
+
+
 
 export default function ReportePDF({
   rows,
@@ -55,6 +72,11 @@ export default function ReportePDF({
   return (
     <Document>
       <Page size="A4" orientation="landscape" style={styles.page}>
+
+         {/* BANNER ARRIBA */}
+          <View style={styles.bannerWrapper}>
+       <Image src="/images/banner-minedu.png" style={styles.banner} />
+       </View>
         <Text style={styles.title}>Reporte de Resultados de "Tu Voz Nos Importa"</Text>
         <View style={styles.filtersBox}>
           {filters?.dre && (
