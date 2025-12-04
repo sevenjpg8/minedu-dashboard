@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { dbQuery } from "@/app/config/connection";
+import bcrypt from "bcrypt";
 
 export async function POST(req: Request) {
   try {
@@ -31,7 +32,9 @@ export async function POST(req: Request) {
     }
 
     // 3️⃣ Validar contraseña
-    if (password !== user.password) {
+    const isValidPassword = await bcrypt.compare(password, user.password);
+
+    if (!isValidPassword) {
       return NextResponse.json(
         { error: "Contraseña incorrecta" },
         { status: 401 }
